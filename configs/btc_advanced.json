@@ -1,0 +1,29 @@
+{
+  "name": "BTC Advanced Futures Analysis",
+  "asset": "BTC",
+  "common_overrides": {
+    "resolution": "1h",
+    "exchange": "binance"
+  },
+  "metrics": [
+    "/derivatives/futures_open_interest_perpetual_sum",
+    "/derivatives/futures_volume_daily_perpetual_sum",
+    {
+      "code": "/derivatives/futures_cvd_perpetual",
+      "chartStyle": "column",
+      "scale": "lin"
+    },
+    {
+      "code": "/derivatives/futures_funding_rate_perpetual",
+      "zoom": "3m"
+    },
+    {
+      "code": "/derivatives/futures_term_structure",
+      "chartStyle": "line"
+    },
+    {
+      "code": "/derivatives/futures_open_interest_crypto_margin_relative_perpetual",
+      "name": "Crypto Margin OI Ratio"
+    }
+  ]
+}

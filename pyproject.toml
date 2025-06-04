@@ -1,0 +1,12 @@
+[project]
+name = "dashboard-gen"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.11.5",
+]
+
+[tool.ruff]
+line-length = 119

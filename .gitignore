@@ -88,4 +88,4 @@ venv.bak/
 # Local development
 local/
 tmp/
-temp/
+temp/.env

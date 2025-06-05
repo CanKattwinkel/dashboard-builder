@@ -110,7 +110,7 @@ def _find_next_layout_position(
         target_y += item_height
 
 
-def create_metric_config(
+def build_metric_config(
     metric_code: str,
     asset: str,
     name: Optional[str] = None,
@@ -272,7 +272,7 @@ def generate_layout(metric_configs: List[MetricConfig]) -> List[LayoutItem]:
     return layouts
 
 
-def create_dashboard(
+def build_dashboard(
     name: str,
     metrics: List[Union[str, Dict[str, Any]]],
     asset: Optional[str] = None,
@@ -292,7 +292,7 @@ def create_dashboard(
 
     Examples:
         # Simple single asset with metric paths
-        dashboard = create_dashboard(
+        dashboard = build_dashboard(
             name="BTC Metrics",
             asset="BTC",
             metrics=["/market/mvrv_z_score", "/indicators/fear_greed"]
@@ -350,7 +350,7 @@ def create_dashboard(
         all_overrides = {**common_overrides, **metric_overrides}
 
         # Create metric config
-        config = create_metric_config(metric_code=metric_code, asset=metric_asset, **all_overrides)
+        config = build_metric_config(metric_code=metric_code, asset=metric_asset, **all_overrides)
         metric_configs.append(config)
 
     # Generate layouts
@@ -360,7 +360,7 @@ def create_dashboard(
     return Dashboard(meta=DashboardMeta(name=name), configs=metric_configs, layouts=layouts)
 
 
-def create_dashboard_from_file(file_path: Union[str, Path]) -> Dashboard:
+def build_dashboard_from_file(file_path: Union[str, Path]) -> Dashboard:
     """
     Creates a dashboard from a JSON specification file.
 
@@ -397,7 +397,7 @@ def create_dashboard_from_file(file_path: Union[str, Path]) -> Dashboard:
     with open(file_path, "r") as f:
         spec = json.load(f)
 
-    return create_dashboard(
+    return build_dashboard(
         name=spec["name"],
         metrics=spec["metrics"],
         asset=spec.get("asset"),

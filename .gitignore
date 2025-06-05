@@ -25,8 +25,11 @@ venv.bak/
 # Project specific
 dashboards/
 *.json
-!configs/*.json
 !pyproject.toml
+
+# Ignore all configs except examples
+configs/*
+!configs/examples/
 
 # Cache
 .ruff_cache/

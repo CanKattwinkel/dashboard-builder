@@ -19,50 +19,52 @@ from models import (
 def _load_defaults() -> Tuple[Dict, Dict, Dict]:
     """Load default configurations from JSON files. Cached for performance."""
     defaults_dir = Path(__file__).parent / "defaults"
-    
+
     # Load asset defaults
     with open(defaults_dir / "assets.json") as f:
         asset_defaults = json.load(f)
-    
+
     # Load metric defaults
     with open(defaults_dir / "metrics.json") as f:
         metric_defaults = json.load(f)
-    
+
     # Load overrides
     with open(defaults_dir / "overrides.json") as f:
         overrides = json.load(f)
-    
+
     return asset_defaults, metric_defaults, overrides
 
 
-def _get_defaults_for_metric(metric_path: str, asset: str) -> Dict[str, Any]:
+def _get_defaults_for_metric(metric_path: Optional[str], asset: str) -> Dict[str, Any]:
     """
     Get all applicable defaults for a metric-asset combination.
     Returns merged defaults following the priority order.
     """
     asset_defaults, metric_defaults, overrides = _load_defaults()
-    
+
     # Start with empty defaults
     defaults = {}
-    
+
+    # If no metric path (dotted format), return empty defaults
+    if metric_path is None:
+        return defaults
+
     # 1. Apply asset defaults
     if asset in asset_defaults:
         defaults.update(asset_defaults[asset])
-    
+
     # 2. Apply metric defaults (exact match or pattern)
     for pattern, values in metric_defaults.items():
         if pattern == metric_path or fnmatch.fnmatch(metric_path, pattern):
             defaults.update(values)
-    
+
     # 3. Apply asset-metric overrides
     if asset in overrides:
         for pattern, values in overrides[asset].items():
             if pattern == metric_path or fnmatch.fnmatch(metric_path, pattern):
                 defaults.update(values)
-    
+
     return defaults
-
-
 
 
 def _format_metric_code_from_path(metric_path: str) -> str:
@@ -145,22 +147,17 @@ def create_metric_config(
     """
     # Store original metric path for defaults lookup
     original_metric_path = metric_code
-    
+
     # Handle both formats: "market.MvrvZScore" and "/market/mvrv_z_score"
     if "/" in metric_code:
         metric_code = _format_metric_code_from_path(metric_code)
     else:
-        # Convert dotted format back to path for defaults lookup
-        parts = metric_code.split(".")
-        if len(parts) == 2:
-            # Convert back to path format for defaults matching
-            domain = parts[0].lower()
-            metric_name = re.sub(r'(?<!^)(?=[A-Z])', '_', parts[1]).lower()
-            original_metric_path = f"/{domain}/{metric_name}"
+        # No defaults loaded for dotted format
+        original_metric_path = None
 
     # Get all applicable defaults for this metric-asset combination
     defaults = _get_defaults_for_metric(original_metric_path, asset.upper())
-    
+
     # Generate UUID and name if not provided
     if uuid_str is None:
         uuid_str = str(uuid.uuid4())
@@ -169,21 +166,31 @@ def create_metric_config(
         name = _generate_metric_name(metric_code)
 
     # Define which fields belong to meta vs extra
-    meta_fields = {"date", "since", "until", "currency", "chartType", "resolution", "exchange", 
-                   "movingMedian", "movingAverage", "expMovingAverage"}
+    meta_fields = {
+        "date",
+        "since",
+        "until",
+        "currency",
+        "chartType",
+        "resolution",
+        "exchange",
+        "movingMedian",
+        "movingAverage",
+        "expMovingAverage",
+    }
     extra_fields = {"zoom", "scale", "lineColor", "price", "chartStyle", "logTickInterval"}
-    
+
     # Build meta kwargs
     meta_kwargs = {
         "metricCode": metric_code,
         "asset": asset.upper(),
     }
-    
+
     # Apply defaults for meta fields
     for field, value in defaults.items():
         if field in meta_fields:
             meta_kwargs[field] = value
-    
+
     # Apply explicit overrides for all meta fields
     if date is not None:
         meta_kwargs["date"] = date
@@ -199,17 +206,17 @@ def create_metric_config(
         meta_kwargs["resolution"] = resolution
     if exchange is not None:
         meta_kwargs["exchange"] = exchange
-    
+
     meta = MetricMeta(**meta_kwargs)
 
     # Build extra kwargs
     extra_kwargs = {"name": name}
-    
+
     # Apply defaults for extra fields
     for field, value in defaults.items():
         if field in extra_fields:
             extra_kwargs[field] = value
-    
+
     # Apply explicit overrides for all extra fields
     if zoom is not None:
         extra_kwargs["zoom"] = zoom

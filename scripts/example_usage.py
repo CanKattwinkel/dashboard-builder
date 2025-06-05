@@ -3,7 +3,8 @@
 
 import json
 import sys
-sys.path.append('..')
+
+sys.path.append("..")
 from dashboard_builder import create_dashboard
 
 # Example 1: Simple single-asset dashboard with metric paths

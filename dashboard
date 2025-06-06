@@ -9,14 +9,39 @@ Usage:
     # Create a new dashboard on Glassnode
     ./dashboard create dashboards/sol_futures_dashboard.json
     
-    # Update an existing dashboard on Glassnode
+    # Update an existing dashboard on Glassnode (with UUID)
     ./dashboard update 29da04cd-1c9a-40a1-76e1-7df6faaf0a6a dashboards/sol_futures_dashboard.json
+    
+    # Update an existing dashboard (auto-lookup UUID from config)
+    ./dashboard update configs/sol_futures.json
 """
 import argparse
 import sys
+import json
+from pathlib import Path
 
 from dashboard_builder import build_dashboard_from_file
 from dashboard_client import create_dashboard, update_dashboard
+
+
+MAPPINGS_FILE = ".dashboard_mappings.json"
+
+
+def load_mappings():
+    """Load UUID mappings from file, return empty dict if not found"""
+    try:
+        with open(MAPPINGS_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+def save_mapping(config_path, dashboard_uuid):
+    """Save config path to UUID mapping"""
+    mappings = load_mappings()
+    mappings[config_path] = dashboard_uuid
+    with open(MAPPINGS_FILE, "w") as f:
+        json.dump(mappings, f, indent=2)
 
 
 def cmd_build(args):
@@ -51,8 +76,19 @@ def cmd_create(args):
     try:
         response = create_dashboard(args.file)
         print(f"✓ Dashboard created (status: {response.status_code})")
-        if response.json():
-            print(f"  UUID: {response.json().get('uuid', 'N/A')}")
+        
+        if response.json() and response.json().get('uuid'):
+            uuid = response.json()['uuid']
+            print(f"  UUID: {uuid}")
+            
+            # Derive config path from dashboard path
+            dashboard_path = Path(args.file)
+            config_name = dashboard_path.stem.replace("_dashboard", "") + ".json"
+            config_path = f"configs/{config_name}"
+            
+            # Save mapping
+            save_mapping(config_path, uuid)
+            print(f"  Saved mapping: {config_path} → {uuid}")
     except Exception as e:
         print(f"✗ Create failed: {e}")
         sys.exit(1)
@@ -61,8 +97,45 @@ def cmd_create(args):
 def cmd_update(args):
     """Update existing dashboard on Glassnode"""
     try:
-        response = update_dashboard(args.uuid, args.file)
-        print(f"✓ Dashboard updated (status: {response.status_code})")
+        # Check if we have UUID + file or just config
+        if args.file:
+            # Traditional: uuid + dashboard file
+            uuid = args.uuid
+            dashboard_file = args.file
+            
+            response = update_dashboard(uuid, dashboard_file)
+            print(f"✓ Dashboard updated (status: {response.status_code})")
+            
+            # Save mapping
+            dashboard_path = Path(dashboard_file)
+            config_name = dashboard_path.stem.replace("_dashboard", "") + ".json"
+            config_path = f"configs/{config_name}"
+            save_mapping(config_path, uuid)
+            
+        else:
+            # New: just config path - lookup UUID
+            config_path = args.uuid  # First arg is actually config path
+            mappings = load_mappings()
+            
+            if config_path not in mappings:
+                print(f"✗ No dashboard UUID found for {config_path}")
+                print("  Create a dashboard first with: ./dashboard create")
+                sys.exit(1)
+            
+            uuid = mappings[config_path]
+            
+            # Build and update
+            dashboard = build_dashboard_from_file(config_path)
+            dashboard_path = Path("dashboards") / (Path(config_path).stem + "_dashboard.json")
+            dashboard_path.parent.mkdir(exist_ok=True)
+            
+            with open(dashboard_path, "w") as f:
+                json.dump(dashboard.model_dump(exclude_none=True), f, indent=2)
+            
+            response = update_dashboard(uuid, dashboard_path)
+            print(f"✓ Dashboard updated (status: {response.status_code})")
+            print(f"  UUID: {uuid}")
+            
     except Exception as e:
         print(f"✗ Update failed: {e}")
         sys.exit(1)
@@ -84,8 +157,8 @@ def main():
     
     # Update command
     update_parser = subparsers.add_parser("update", help="Update existing dashboard on Glassnode")
-    update_parser.add_argument("uuid", help="Dashboard UUID")
-    update_parser.add_argument("file", help="Dashboard JSON file (e.g., dashboards/sol_futures_dashboard.json)")
+    update_parser.add_argument("uuid", help="Dashboard UUID or config file path")
+    update_parser.add_argument("file", nargs='?', help="Dashboard JSON file (optional if using config path)")
     
     args = parser.parse_args()
     

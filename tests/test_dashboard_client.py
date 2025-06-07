@@ -6,20 +6,20 @@ import json
 import tempfile
 from pathlib import Path
 from unittest import mock
-import requests
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Mock the API key at import time
-with mock.patch.dict(os.environ, {"GLASSNODE_API_KEY": "test-key"}):
-    from dashboard_client import create_dashboard, update_dashboard
+# Import after setting env var
+from dashboard_client import create_dashboard, update_dashboard, API_KEY
+import requests
 
 
 def test_create_dashboard():
     """Test creating a dashboard"""
     # Expected use - successful creation
-    with mock.patch("dashboard_client.requests.post") as mock_post:
+    with mock.patch("requests.post") as mock_post:
         mock_response = mock.Mock()
         mock_response.status_code = 201
         mock_response.json.return_value = {"uuid": "new-uuid-123"}
@@ -38,7 +38,7 @@ def test_create_dashboard():
         assert response.json()["uuid"] == "new-uuid-123"
 
     # Edge case - dashboard data already wrapped with categoryUuid
-    with mock.patch("dashboard_client.requests.post") as mock_post:
+    with mock.patch("requests.post") as mock_post:
         mock_response = mock.Mock()
         mock_response.raise_for_status = mock.Mock()
         mock_post.return_value = mock_response
@@ -52,7 +52,7 @@ def test_create_dashboard():
         assert "data" in call_json
 
     # Edge case - create from file
-    with mock.patch("dashboard_client.requests.post") as mock_post:
+    with mock.patch("requests.post") as mock_post:
         mock_response = mock.Mock()
         mock_response.raise_for_status = mock.Mock()
         mock_post.return_value = mock_response
@@ -70,7 +70,7 @@ def test_create_dashboard():
             os.unlink(temp_path)
 
     # Failing case - API error
-    with mock.patch("dashboard_client.requests.post") as mock_post:
+    with mock.patch("requests.post") as mock_post:
         mock_response = mock.Mock()
         mock_response.raise_for_status.side_effect = requests.HTTPError("400 Bad Request")
         mock_post.return_value = mock_response
@@ -86,8 +86,8 @@ def test_update_dashboard():
     """Test updating a dashboard"""
     # Expected use - successful update
     with (
-        mock.patch("dashboard_client.requests.get") as mock_get,
-        mock.patch("dashboard_client.requests.put") as mock_put,
+        mock.patch("requests.get") as mock_get,
+        mock.patch("requests.put") as mock_put,
     ):
         # Mock GET response
         mock_get_resp = mock.Mock()
@@ -114,8 +114,8 @@ def test_update_dashboard():
 
     # Edge case - update from file path
     with (
-        mock.patch("dashboard_client.requests.get") as mock_get,
-        mock.patch("dashboard_client.requests.put") as mock_put,
+        mock.patch("requests.get") as mock_get,
+        mock.patch("requests.put") as mock_put,
     ):
         mock_get_resp = mock.Mock()
         mock_get_resp.json.return_value = {"categoryUuid": "cat-123"}
@@ -140,8 +140,8 @@ def test_update_dashboard():
 
     # Edge case - dashboard has no categoryUuid (uses default)
     with (
-        mock.patch("dashboard_client.requests.get") as mock_get,
-        mock.patch("dashboard_client.requests.put") as mock_put,
+        mock.patch("requests.get") as mock_get,
+        mock.patch("requests.put") as mock_put,
     ):
         mock_get_resp = mock.Mock()
         mock_get_resp.json.return_value = {}  # No categoryUuid
@@ -172,7 +172,7 @@ def test_update_dashboard():
 def test_api_key_handling():
     """Test API key is included in requests"""
     # Test create includes API key
-    with mock.patch("dashboard_client.requests.post") as mock_post:
+    with mock.patch("requests.post") as mock_post:
         mock_response = mock.Mock()
         mock_response.raise_for_status = mock.Mock()
         mock_post.return_value = mock_response
@@ -180,12 +180,12 @@ def test_api_key_handling():
         create_dashboard({})
 
         params = mock_post.call_args[1]["params"]
-        assert params["api_key"] == "test-key"
+        assert params["api_key"] == API_KEY
 
     # Test update includes API key
     with (
-        mock.patch("dashboard_client.requests.get") as mock_get,
-        mock.patch("dashboard_client.requests.put") as mock_put,
+        mock.patch("requests.get") as mock_get,
+        mock.patch("requests.put") as mock_put,
     ):
         mock_get_resp = mock.Mock()
         mock_get_resp.json.return_value = {"categoryUuid": "cat"}
@@ -199,8 +199,8 @@ def test_api_key_handling():
         update_dashboard("uuid", {})
 
         # Check both GET and PUT have API key
-        assert mock_get.call_args[1]["params"]["api_key"] == "test-key"
-        assert mock_put.call_args[1]["params"]["api_key"] == "test-key"
+        assert mock_get.call_args[1]["params"]["api_key"] == API_KEY
+        assert mock_put.call_args[1]["params"]["api_key"] == API_KEY
 
 
 if __name__ == "__main__":

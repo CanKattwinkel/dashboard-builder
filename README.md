@@ -65,7 +65,7 @@ Using UUID directly:
 ```json
 {
   "name": "Multi-Asset Dashboard",
-  "commonOverrides": {
+  "dashboardOverrides": {
     "zoom": "3m",
     "resolution": "1h"
   },
@@ -90,7 +90,7 @@ Using UUID directly:
 
 Settings are applied in priority order:
 1. Metric-specific overrides (highest)
-2. Common overrides
+2. Dashboard overrides
 3. Asset-metric combination defaults (`defaults/overrides.json`)
 4. Metric pattern defaults (`defaults/metrics.json`)
 5. Asset defaults (`defaults/assets.json`)

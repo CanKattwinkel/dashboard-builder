@@ -11,19 +11,31 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the functions we'll test by mocking dependencies first
 from unittest.mock import MagicMock, Mock, patch, mock_open
+import importlib
+import dashboard_client as real_dashboard_client
+import dashboard_builder as real_dashboard_builder
 
-# Set up mock modules before importing dashboard
-sys.modules["dashboard_client"] = MagicMock()
-sys.modules["dashboard_builder"] = MagicMock()
+# Create mock modules for the dashboard script
+mock_dashboard_client = MagicMock()
+mock_dashboard_builder = MagicMock()
 
-# Now we can import the actual dashboard functions
-# We'll execute the dashboard file but capture its globals
-dashboard_globals = {"__name__": "dashboard"}
+# Execute the dashboard file with mocked dependencies
+dashboard_globals = {
+    "__name__": "dashboard",
+    "dashboard_client": mock_dashboard_client,
+    "dashboard_builder": mock_dashboard_builder,
+    "create_dashboard": mock_dashboard_client.create_dashboard,
+    "update_dashboard": mock_dashboard_client.update_dashboard,
+    "build_dashboard_from_file": mock_dashboard_builder.build_dashboard_from_file,
+}
+
 dashboard_path = Path(__file__).parent.parent / "dashboard"
 with open(dashboard_path, "r") as f:
     dashboard_code = f.read()
-    # Prevent main from running
+    # Prevent main from running and adjust imports
     dashboard_code = dashboard_code.replace('if __name__ == "__main__":', "if False:")
+    dashboard_code = dashboard_code.replace('from dashboard_builder import build_dashboard_from_file', '')
+    dashboard_code = dashboard_code.replace('from dashboard_client import create_dashboard, update_dashboard', '')
     exec(dashboard_code, dashboard_globals)
 
 # Extract functions we need to test
@@ -238,33 +250,42 @@ def test_cmd_update_with_config():
         json.dump(mappings_data, f)
         temp_path = f.name
 
-    try:
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
+    # Create a temporary directory for dashboard output
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            dashboard_globals["MAPPINGS_FILE"] = temp_path
 
-        # Mock dashboard build
-        mock_dashboard = Mock()
-        mock_dashboard.model_dump.return_value = {"test": "data"}
-        dashboard_globals["build_dashboard_from_file"].return_value = mock_dashboard
+            # Mock dashboard build
+            mock_dashboard = Mock()
+            mock_dashboard.model_dump.return_value = {"test": "data"}
+            dashboard_globals["build_dashboard_from_file"].return_value = mock_dashboard
 
-        # Mock update response
-        mock_response = Mock()
-        mock_response.status_code = 200
-        dashboard_globals["update_dashboard"].return_value = mock_response
+            # Mock update response
+            mock_response = Mock()
+            mock_response.status_code = 200
+            dashboard_globals["update_dashboard"].return_value = mock_response
 
-        args = Mock()
-        args.uuid = "configs/test.json"  # Config path instead of UUID
-        args.file = None
+            args = Mock()
+            args.uuid = "configs/test.json"  # Config path instead of UUID
+            args.file = None
 
-        with patch("builtins.open", mock_open()):
+            # Ensure dashboards directory exists
+            os.makedirs("dashboards", exist_ok=True)
+            
             cmd_update(args)
 
-        # Verify it used the mapped UUID
-        call_args = dashboard_globals["update_dashboard"].call_args[0]
-        assert call_args[0] == "mapped-uuid-123"
+            # Verify it used the mapped UUID
+            call_args = dashboard_globals["update_dashboard"].call_args[0]
+            assert call_args[0] == "mapped-uuid-123"
+            
+            # Clean up the created dashboard file
+            dashboard_file = Path("dashboards/test_dashboard.json")
+            if dashboard_file.exists():
+                dashboard_file.unlink()
 
-    finally:
-        os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
+        finally:
+            os.unlink(temp_path)
+            dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
 
     # Edge case - config not in mappings
     empty_mapping = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)

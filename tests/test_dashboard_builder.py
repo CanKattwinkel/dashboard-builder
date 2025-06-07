@@ -157,7 +157,7 @@ def test_build_dashboard():
         name="Common Overrides",
         asset="BTC",
         metrics=["/market/price", "/market/volume"],
-        common_overrides={"resolution": "4h", "currency": "EUR", "chartStyle": "column"},
+        dashboard_overrides={"resolution": "4h", "currency": "EUR", "chartStyle": "column"},
     )
     assert all(c.meta.resolution == "4h" for c in dashboard.configs)
     assert all(c.meta.currency == "EUR" for c in dashboard.configs)
@@ -171,7 +171,7 @@ def test_build_dashboard():
             "/market/price",
             {"code": "/market/volume", "resolution": "1h"},  # Overrides common
         ],
-        common_overrides={"resolution": "24h"},
+        dashboard_overrides={"resolution": "24h"},
     )
     assert dashboard.configs[0].meta.resolution == "24h"  # Common
     assert dashboard.configs[1].meta.resolution == "1h"  # Specific wins
@@ -225,7 +225,7 @@ def test_build_dashboard_from_file():
         "name": "Override Dashboard",
         "asset": "ETH",
         "metrics": ["/market/price"],
-        "common_overrides": {"resolution": "1h", "currency": "EUR"},
+        "dashboardOverrides": {"resolution": "1h", "currency": "EUR"},
     }
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:

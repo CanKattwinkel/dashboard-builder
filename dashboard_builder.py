@@ -276,7 +276,7 @@ def build_dashboard(
     name: str,
     metrics: List[Union[str, Dict[str, Any]]],
     asset: Optional[str] = None,
-    common_overrides: Optional[Dict[str, Any]] = None,
+    dashboard_overrides: Optional[Dict[str, Any]] = None,
 ) -> Dashboard:
     """
     Creates a dashboard from a list of metrics specifications.
@@ -285,7 +285,7 @@ def build_dashboard(
         name: Dashboard name
         metrics: List of metric paths (strings) or metric specifications (dicts)
         asset: Global asset to use if not specified per metric
-        common_overrides: Common overrides to apply to all metrics
+        dashboard_overrides: Dashboard-specific overrides to apply to all metrics
 
     Returns:
         Dashboard object
@@ -318,8 +318,8 @@ def build_dashboard(
 
         # Note: Also supports dotted format (e.g., "market.PriceUsdClose") for backwards compatibility
     """
-    if common_overrides is None:
-        common_overrides = {}
+    if dashboard_overrides is None:
+        dashboard_overrides = {}
 
     metric_configs = []
 
@@ -346,8 +346,8 @@ def build_dashboard(
         if not metric_asset:
             raise ValueError(f"No asset specified for metric: {metric_code}")
 
-        # Merge common overrides with metric-specific overrides
-        all_overrides = {**common_overrides, **metric_overrides}
+        # Merge dashboard overrides with metric-specific overrides
+        all_overrides = {**dashboard_overrides, **metric_overrides}
 
         # Create metric config
         config = build_metric_config(metric_code=metric_code, asset=metric_asset, **all_overrides)
@@ -374,7 +374,7 @@ def build_dashboard_from_file(file_path: Union[str, Path]) -> Dashboard:
         {
             "name": "My Dashboard",
             "asset": "BTC",  // optional global asset
-            "common_overrides": {  // optional
+            "dashboardOverrides": {  // optional
                 "resolution": "1h"
             },
             "metrics": [
@@ -401,5 +401,5 @@ def build_dashboard_from_file(file_path: Union[str, Path]) -> Dashboard:
         name=spec["name"],
         metrics=spec["metrics"],
         asset=spec.get("asset"),
-        common_overrides=spec.get("common_overrides"),
+        dashboard_overrides=spec.get("dashboardOverrides", spec.get("common_overrides")),
     )

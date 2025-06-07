@@ -11,9 +11,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the functions we'll test by mocking dependencies first
 from unittest.mock import MagicMock, Mock, patch, mock_open
-import importlib
-import dashboard_client as real_dashboard_client
-import dashboard_builder as real_dashboard_builder
 
 # Create mock modules for the dashboard script
 mock_dashboard_client = MagicMock()

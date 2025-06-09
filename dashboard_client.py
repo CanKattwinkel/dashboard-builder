@@ -85,8 +85,7 @@ def create_dashboard(
 
 
 def create_dashboards(
-    dashboard_files: Union[List[Union[str, Path]], str, Path], 
-    category_uuid: str = "My Dashboards"
+    dashboard_files: Union[List[Union[str, Path]], str, Path], category_uuid: str = "My Dashboards"
 ) -> Dict[Path, requests.Response]:
     """
     Create multiple Glassnode dashboards via their API.
@@ -101,7 +100,7 @@ def create_dashboards(
     Example:
         # From list of files
         responses = create_dashboards(["dashboards/btc.json", "dashboards/eth.json"])
-        
+
         # From directory
         responses = create_dashboards("dashboards/examples")
         for file_path, response in responses.items():
@@ -115,9 +114,9 @@ def create_dashboards(
             dashboard_files = list(directory.glob("*.json"))
         else:
             dashboard_files = [dashboard_files]
-    
+
     responses = {}
-    
+
     for file_path in dashboard_files:
         file_path = Path(file_path)
         try:
@@ -126,20 +125,23 @@ def create_dashboards(
             print(f"✓ Created dashboard from {file_path}")
         except Exception as e:
             print(f"✗ Failed to create dashboard from {file_path}: {e}")
+
             # Store the exception as a mock response for consistency
             class ErrorResponse:
                 def __init__(self, error):
                     self.error = error
                     self.status_code = 500
+
                 def json(self):
                     return {"error": str(self.error)}
+
             responses[file_path] = ErrorResponse(e)
-    
+
     return responses
 
 
 def update_dashboards(
-    dashboard_mapping: Union[Dict[str, Union[str, Path]], List[tuple], str, Path]
+    dashboard_mapping: Union[Dict[str, Union[str, Path]], List[tuple], str, Path],
 ) -> Dict[str, requests.Response]:
     """
     Update multiple Glassnode dashboards via their API.
@@ -159,13 +161,13 @@ def update_dashboards(
             "uuid-1": "dashboards/btc.json",
             "uuid-2": "dashboards/eth.json"
         })
-        
+
         # From list of tuples
         responses = update_dashboards([
             ("uuid-1", "dashboards/btc.json"),
             ("uuid-2", "dashboards/eth.json")
         ])
-        
+
         # From directory (uses .dashboard_mappings.json)
         responses = update_dashboards("dashboards/examples")
     """
@@ -176,27 +178,29 @@ def update_dashboards(
             mappings_file = Path(".dashboard_mappings.json")
             if not mappings_file.exists():
                 raise ValueError("No .dashboard_mappings.json file found for UUID lookups")
-            
+
             with open(mappings_file, "r") as f:
                 all_mappings = json.load(f)
-            
+
             # Filter mappings for dashboards in this directory
             dashboard_mapping = {}
             for config_path, uuid in all_mappings.items():
                 # Convert config path to dashboard path
-                dashboard_path = Path(str(Path(config_path).parent).replace("configs", "dashboards", 1)) / (Path(config_path).stem + "_dashboard.json")
+                dashboard_path = Path(str(Path(config_path).parent).replace("configs", "dashboards", 1)) / (
+                    Path(config_path).stem + "_dashboard.json"
+                )
                 if str(directory) in str(dashboard_path) and dashboard_path.exists():
                     dashboard_mapping[uuid] = dashboard_path
-            
+
             if not dashboard_mapping:
                 raise ValueError(f"No mapped dashboards found in {directory}")
-    
+
     # Convert list of tuples to dict
     elif isinstance(dashboard_mapping, list):
         dashboard_mapping = dict(dashboard_mapping)
-    
+
     responses = {}
-    
+
     for uuid, file_path in dashboard_mapping.items():
         file_path = Path(file_path)
         try:
@@ -205,13 +209,16 @@ def update_dashboards(
             print(f"✓ Updated dashboard {uuid} from {file_path}")
         except Exception as e:
             print(f"✗ Failed to update dashboard {uuid} from {file_path}: {e}")
+
             # Store the exception as a mock response
             class ErrorResponse:
                 def __init__(self, error):
                     self.error = error
                     self.status_code = 500
+
                 def json(self):
                     return {"error": str(self.error)}
+
             responses[uuid] = ErrorResponse(e)
-    
+
     return responses

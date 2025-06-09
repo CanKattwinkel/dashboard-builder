@@ -424,16 +424,16 @@ def build_dashboards_from_directory(
             print(f"Built {dashboard.meta.name} from {file_path}")
     """
     directory_path = Path(directory_path)
-    
+
     if not directory_path.is_dir():
         raise ValueError(f"Not a directory: {directory_path}")
-    
+
     dashboards = {}
     json_files = list(directory_path.glob(pattern))
-    
+
     if not json_files:
         raise ValueError(f"No JSON files found in {directory_path} matching pattern '{pattern}'")
-    
+
     for json_file in json_files:
         try:
             dashboard = build_dashboard_from_file(json_file)
@@ -442,5 +442,5 @@ def build_dashboards_from_directory(
             # Log error but continue with other files
             print(f"Error building dashboard from {json_file}: {e}")
             continue
-    
+
     return dashboards

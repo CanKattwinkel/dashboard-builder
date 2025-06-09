@@ -31,27 +31,36 @@ import json
 from pathlib import Path
 
 from dashboard_builder import build_dashboard_from_file, build_dashboards_from_directory
-from dashboard_client import create_dashboard, update_dashboard, create_dashboards, update_dashboards
+from dashboard_client import (
+    create_dashboard, update_dashboard, create_dashboards, update_dashboards,
+    load_mappings, save_mapping, MAPPINGS_FILE
+)
 
 
-MAPPINGS_FILE = ".dashboard_mappings.json"
+def config_to_dashboard_path(config_path):
+    """Convert config path to dashboard path."""
+    config_path = Path(config_path)
+    output_name = config_path.stem + "_dashboard.json"
+    return Path(str(config_path.parent).replace("configs", "dashboards", 1)) / output_name
 
 
-def load_mappings():
-    """Load UUID mappings from file, return empty dict if not found"""
-    try:
-        with open(MAPPINGS_FILE, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
+def dashboard_to_config_path(dashboard_path):
+    """Convert dashboard path to config path."""
+    dashboard_path = Path(dashboard_path)
+    config_name = dashboard_path.stem.replace("_dashboard", "") + ".json"
+    return str(Path(str(dashboard_path.parent).replace("dashboards", "configs", 1)) / config_name)
 
 
-def save_mapping(config_path, dashboard_uuid):
-    """Save config path to UUID mapping"""
-    mappings = load_mappings()
-    mappings[config_path] = dashboard_uuid
-    with open(MAPPINGS_FILE, "w") as f:
-        json.dump(mappings, f, indent=2)
+def build_and_save_dashboard(config_path):
+    """Build dashboard from config and save to file. Returns the dashboard path."""
+    dashboard = build_dashboard_from_file(config_path)
+    output_path = config_to_dashboard_path(config_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(output_path, "w") as f:
+        json.dump(dashboard.model_dump(exclude_none=True), f, indent=2)
+    
+    return output_path, dashboard
 
 
 def cmd_build(args):
@@ -69,8 +78,7 @@ def cmd_build(args):
             built_count = 0
             for file_path, dashboard in dashboards.items():
                 # Generate output path
-                output_name = file_path.stem + "_dashboard.json"
-                output_path = Path(str(file_path.parent).replace("configs", "dashboards", 1)) / output_name
+                output_path = config_to_dashboard_path(file_path)
                 
                 # Create parent directories if they don't exist
                 output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -87,18 +95,7 @@ def cmd_build(args):
             print(f"\n✓ Built {built_count} dashboards from {config_path}")
         else:
             # Single file build
-            dashboard = build_dashboard_from_file(args.config)
-            
-            # Simply replace 'configs' with 'dashboards' in the path
-            output_name = config_path.stem + "_dashboard.json"
-            output_path = Path(str(config_path.parent).replace("configs", "dashboards", 1)) / output_name
-            
-            # Create parent directories if they don't exist
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Save dashboard
-            with open(output_path, "w") as f:
-                json.dump(dashboard.model_dump(exclude_none=True), f, indent=2)
+            output_path, dashboard = build_and_save_dashboard(args.config)
             
             print(f"✓ Dashboard built: {output_path}")
             print(f"  Name: {dashboard.meta.name}")
@@ -125,8 +122,7 @@ def cmd_create(args):
                     uuid = response.json()['uuid']
                     
                     # Derive config path from dashboard path
-                    config_name = file_path.stem.replace("_dashboard", "") + ".json"
-                    config_path = str(file_path.parent).replace("dashboards", "configs", 1) + "/" + config_name
+                    config_path = dashboard_to_config_path(file_path)
                     
                     mappings[config_path] = uuid
                     created_count += 1
@@ -147,8 +143,7 @@ def cmd_create(args):
                 print(f"  UUID: {uuid}")
                 
                 # Derive config path from dashboard path
-                config_name = dashboard_path.stem.replace("_dashboard", "") + ".json"
-                config_path = str(dashboard_path.parent).replace("dashboards", "configs", 1) + "/" + config_name
+                config_path = dashboard_to_config_path(dashboard_path)
                 
                 # Save mapping
                 save_mapping(config_path, uuid)
@@ -170,13 +165,8 @@ def cmd_update(args):
                 # Build dashboards first
                 dashboards = build_dashboards_from_directory(path)
                 
-                for file_path, dashboard in dashboards.items():
-                    output_name = file_path.stem + "_dashboard.json"
-                    output_path = Path(str(file_path.parent).replace("configs", "dashboards", 1)) / output_name
-                    output_path.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    with open(output_path, "w") as f:
-                        json.dump(dashboard.model_dump(exclude_none=True), f, indent=2)
+                for file_path in dashboards:
+                    build_and_save_dashboard(file_path)
                 
                 # Now update using the dashboards directory
                 dashboard_dir = Path(str(path).replace("configs", "dashboards", 1))
@@ -198,8 +188,7 @@ def cmd_update(args):
             
             # Save mapping
             dashboard_path = Path(dashboard_file)
-            config_name = dashboard_path.stem.replace("_dashboard", "") + ".json"
-            config_path = str(dashboard_path.parent).replace("dashboards", "configs", 1) + "/" + config_name
+            config_path = dashboard_to_config_path(dashboard_path)
             save_mapping(config_path, uuid)
             
         else:
@@ -215,16 +204,7 @@ def cmd_update(args):
             uuid = mappings[config_path]
             
             # Build and update
-            dashboard = build_dashboard_from_file(config_path)
-            
-            # Simply replace 'configs' with 'dashboards' in the path
-            config_path_obj = Path(config_path)
-            output_name = config_path_obj.stem + "_dashboard.json"
-            dashboard_path = Path(str(config_path_obj.parent).replace("configs", "dashboards", 1)) / output_name
-            dashboard_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(dashboard_path, "w") as f:
-                json.dump(dashboard.model_dump(exclude_none=True), f, indent=2)
+            dashboard_path, _ = build_and_save_dashboard(config_path)
             
             response = update_dashboard(uuid, dashboard_path)
             print(f"✓ Dashboard updated (status: {response.status_code})")

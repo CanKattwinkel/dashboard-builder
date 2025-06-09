@@ -11,6 +11,25 @@ API_KEY = os.getenv("GLASSNODE_API_KEY")
 if not API_KEY:
     raise ValueError("GLASSNODE_API_KEY not found in environment variables")
 
+MAPPINGS_FILE = ".dashboard_mappings.json"
+
+
+def load_mappings():
+    """Load UUID mappings from file, return empty dict if not found"""
+    try:
+        with open(MAPPINGS_FILE, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+
+def save_mapping(config_path, dashboard_uuid):
+    """Save config path to UUID mapping"""
+    mappings = load_mappings()
+    mappings[config_path] = dashboard_uuid
+    with open(MAPPINGS_FILE, "w") as f:
+        json.dump(mappings, f, indent=2)
+
 
 def update_dashboard(dashboard_uuid: str, dashboard_data: Union[Dict[str, Any], str, Path]) -> requests.Response:
     """

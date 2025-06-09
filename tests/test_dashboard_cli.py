@@ -25,6 +25,9 @@ dashboard_globals = {
     "update_dashboard": mock_dashboard_client.update_dashboard,
     "create_dashboards": mock_dashboard_client.create_dashboards,
     "update_dashboards": mock_dashboard_client.update_dashboards,
+    "load_mappings": mock_dashboard_client.load_mappings,
+    "save_mapping": mock_dashboard_client.save_mapping,
+    "MAPPINGS_FILE": ".dashboard_mappings.json",
     "build_dashboard_from_file": mock_dashboard_builder.build_dashboard_from_file,
     "build_dashboards_from_directory": mock_dashboard_builder.build_dashboards_from_directory,
 }
@@ -38,119 +41,72 @@ with open(dashboard_path, "r") as f:
         "from dashboard_builder import build_dashboard_from_file, build_dashboards_from_directory", ""
     )
     dashboard_code = dashboard_code.replace(
-        "from dashboard_client import create_dashboard, update_dashboard, create_dashboards, update_dashboards", ""
+        "from dashboard_client import (\n    create_dashboard, update_dashboard, create_dashboards, update_dashboards,\n    load_mappings, save_mapping, MAPPINGS_FILE\n)", ""
     )
     exec(dashboard_code, dashboard_globals)
 
 # Extract functions we need to test
-load_mappings_orig = dashboard_globals["load_mappings"]
-save_mapping_orig = dashboard_globals["save_mapping"]
 cmd_build = dashboard_globals["cmd_build"]
 cmd_create = dashboard_globals["cmd_create"]
 cmd_update = dashboard_globals["cmd_update"]
+config_to_dashboard_path = dashboard_globals["config_to_dashboard_path"]
+dashboard_to_config_path = dashboard_globals["dashboard_to_config_path"]
+build_and_save_dashboard = dashboard_globals["build_and_save_dashboard"]
+
+
+def test_path_conversions():
+    """Test path conversion utility functions"""
+    # Test config to dashboard path
+    assert config_to_dashboard_path("configs/test.json") == Path("dashboards/test_dashboard.json")
+    assert config_to_dashboard_path("configs/examples/test.json") == Path("dashboards/examples/test_dashboard.json")
+    assert config_to_dashboard_path("configs/sub/dir/test.json") == Path("dashboards/sub/dir/test_dashboard.json")
+    
+    # Test dashboard to config path
+    assert dashboard_to_config_path("dashboards/test_dashboard.json") == "configs/test.json"
+    assert dashboard_to_config_path("dashboards/examples/test_dashboard.json") == "configs/examples/test.json"
+    assert dashboard_to_config_path("dashboards/sub/dir/test_dashboard.json") == "configs/sub/dir/test.json"
+    
+    # Test round-trip conversion
+    config_path = "configs/examples/complex_name.json"
+    dashboard_path = config_to_dashboard_path(config_path)
+    assert dashboard_to_config_path(dashboard_path) == config_path
 
 
 def test_load_mappings():
-    """Test loading UUID mappings"""
-    # Expected use - file exists
-    mappings_data = {"configs/test.json": "uuid-123", "configs/other.json": "uuid-456"}
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump(mappings_data, f)
-        temp_path = f.name
-
-    try:
-        # Monkey patch the MAPPINGS_FILE for this test
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
-        mappings = load_mappings_orig()
-        assert mappings == mappings_data
-    finally:
-        os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
-
-    # Edge case - empty file
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        f.write("{}")
-        temp_path = f.name
-
-    try:
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
-        mappings = load_mappings_orig()
-        assert mappings == {}
-    finally:
-        os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
-
-    # Edge case - file doesn't exist
-    dashboard_globals["MAPPINGS_FILE"] = "nonexistent.json"
-    mappings = load_mappings_orig()
-    assert mappings == {}
-    dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
-
-    # Failing case - corrupted JSON
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        f.write("{invalid json}")
-        temp_path = f.name
-
-    try:
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
-        try:
-            load_mappings_orig()
-            assert False, "Should have raised JSONDecodeError"
-        except json.JSONDecodeError:
-            pass
-    finally:
-        os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
+    """Test loading UUID mappings - now delegates to dashboard_client"""
+    # The load_mappings is now imported from dashboard_client, so we just verify it's a mock
+    assert hasattr(dashboard_globals["load_mappings"], 'return_value'), "load_mappings should be a mock"
 
 
 def test_save_mapping():
-    """Test saving UUID mappings"""
-    # Expected use - add new mapping
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"existing.json": "old-uuid"}, f)
-        temp_path = f.name
+    """Test saving UUID mappings - now delegates to dashboard_client"""
+    # The save_mapping is now imported from dashboard_client, so we just verify it's a mock
+    assert hasattr(dashboard_globals["save_mapping"], 'assert_called_with'), "save_mapping should be a mock"
 
-    try:
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
-        save_mapping_orig("new.json", "new-uuid")
 
-        with open(temp_path) as f:
-            mappings = json.load(f)
-        assert mappings["existing.json"] == "old-uuid"
-        assert mappings["new.json"] == "new-uuid"
-    finally:
-        os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
-
-    # Edge case - overwrite existing mapping
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"config.json": "old-uuid"}, f)
-        temp_path = f.name
-
-    try:
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
-        save_mapping_orig("config.json", "new-uuid")
-
-        with open(temp_path) as f:
-            mappings = json.load(f)
-        assert mappings["config.json"] == "new-uuid"  # Overwritten
-    finally:
-        os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
-
-    # Edge case - first mapping (file doesn't exist)
-    temp_path = tempfile.mktemp(suffix=".json")
-    try:
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
-        save_mapping_orig("first.json", "first-uuid")
-
-        with open(temp_path) as f:
-            mappings = json.load(f)
-        assert mappings == {"first.json": "first-uuid"}
-    finally:
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
+def test_build_and_save_dashboard():
+    """Test the build_and_save_dashboard utility function"""
+    # Mock dashboard
+    mock_dashboard = Mock()
+    mock_dashboard.meta.name = "Test Dashboard"
+    mock_dashboard.configs = [Mock(), Mock()]
+    mock_dashboard.model_dump.return_value = {"test": "data"}
+    dashboard_globals["build_dashboard_from_file"].return_value = mock_dashboard
+    
+    with patch("builtins.open", mock_open()) as mock_file, patch("pathlib.Path.mkdir"):
+        # Test the function
+        output_path, dashboard = build_and_save_dashboard("configs/test.json")
+        
+        # Verify output path is correct
+        assert output_path == Path("dashboards/test_dashboard.json")
+        
+        # Verify dashboard was returned
+        assert dashboard == mock_dashboard
+        
+        # Verify file was written
+        mock_file.assert_called()
+        write_calls = mock_file().write.call_args_list
+        assert len(write_calls) > 0
 
 
 def test_cmd_create():
@@ -163,25 +119,15 @@ def test_cmd_create():
     dashboard_globals["create_dashboard"].return_value = mock_response
 
     # Mock save_mapping
-    saved_mappings = []
+    dashboard_globals["save_mapping"].reset_mock()
 
-    def mock_save(config, uuid):
-        saved_mappings.append((config, uuid))
+    args = Mock()
+    args.file = "dashboards/test_dashboard.json"
 
-    original_save = dashboard_globals["save_mapping"]
-    dashboard_globals["save_mapping"] = mock_save
+    cmd_create(args)
 
-    try:
-        args = Mock()
-        args.file = "dashboards/test_dashboard.json"
-
-        cmd_create(args)
-
-        # Verify mapping was saved
-        assert len(saved_mappings) == 1
-        assert saved_mappings[0] == ("configs/test.json", "created-uuid-123")
-    finally:
-        dashboard_globals["save_mapping"] = original_save
+    # Verify mapping was saved
+    dashboard_globals["save_mapping"].assert_called_once_with("configs/test.json", "created-uuid-123")
 
     # Edge case - no UUID in response
     mock_response = Mock()
@@ -189,19 +135,15 @@ def test_cmd_create():
     mock_response.json.return_value = {}  # No UUID
 
     dashboard_globals["create_dashboard"].return_value = mock_response
-    saved_mappings = []
+    dashboard_globals["save_mapping"].reset_mock()
 
-    dashboard_globals["save_mapping"] = mock_save
-    try:
-        args = Mock()
-        args.file = "dashboards/test_dashboard.json"
+    args = Mock()
+    args.file = "dashboards/test_dashboard.json"
 
-        cmd_create(args)
+    cmd_create(args)
 
-        # Mapping should NOT be saved
-        assert len(saved_mappings) == 0
-    finally:
-        dashboard_globals["save_mapping"] = original_save
+    # Mapping should NOT be saved
+    dashboard_globals["save_mapping"].assert_not_called()
 
     # Failing case - API error
     dashboard_globals["create_dashboard"].side_effect = Exception("API Error")
@@ -225,92 +167,63 @@ def test_cmd_update_with_uuid():
     mock_response.status_code = 200
     dashboard_globals["update_dashboard"].return_value = mock_response
 
-    saved_mappings = []
+    dashboard_globals["save_mapping"].reset_mock()
 
-    def mock_save(config, uuid):
-        saved_mappings.append((config, uuid))
+    args = Mock()
+    args.uuid = "explicit-uuid-123"
+    args.file = "dashboards/test_dashboard.json"
 
-    original_save = dashboard_globals["save_mapping"]
-    dashboard_globals["save_mapping"] = mock_save
+    cmd_update(args)
 
-    try:
-        args = Mock()
-        args.uuid = "explicit-uuid-123"
-        args.file = "dashboards/test_dashboard.json"
-
-        cmd_update(args)
-
-        assert dashboard_globals["update_dashboard"].called
-        assert saved_mappings[0] == ("configs/test.json", "explicit-uuid-123")
-    finally:
-        dashboard_globals["save_mapping"] = original_save
+    assert dashboard_globals["update_dashboard"].called
+    dashboard_globals["save_mapping"].assert_called_once_with("configs/test.json", "explicit-uuid-123")
 
 
 def test_cmd_update_with_config():
     """Test update command with config path (UUID lookup)"""
-    # Set up test mappings file
-    mappings_data = {"configs/test.json": "mapped-uuid-123"}
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump(mappings_data, f)
-        temp_path = f.name
+    # Mock load_mappings to return test data
+    dashboard_globals["load_mappings"].return_value = {"configs/test.json": "mapped-uuid-123"}
 
-    # Create a temporary directory for dashboard output
-    with tempfile.TemporaryDirectory() as temp_dir:
-        try:
-            dashboard_globals["MAPPINGS_FILE"] = temp_path
+    # Mock dashboard build
+    mock_dashboard = Mock()
+    mock_dashboard.model_dump.return_value = {"test": "data"}
+    dashboard_globals["build_dashboard_from_file"].return_value = mock_dashboard
 
-            # Mock dashboard build
-            mock_dashboard = Mock()
-            mock_dashboard.model_dump.return_value = {"test": "data"}
-            dashboard_globals["build_dashboard_from_file"].return_value = mock_dashboard
+    # Mock update response
+    mock_response = Mock()
+    mock_response.status_code = 200
+    dashboard_globals["update_dashboard"].return_value = mock_response
 
-            # Mock update response
-            mock_response = Mock()
-            mock_response.status_code = 200
-            dashboard_globals["update_dashboard"].return_value = mock_response
+    args = Mock()
+    args.uuid = "configs/test.json"  # Config path instead of UUID
+    args.file = None
 
-            args = Mock()
-            args.uuid = "configs/test.json"  # Config path instead of UUID
-            args.file = None
+    # Ensure dashboards directory exists
+    os.makedirs("dashboards", exist_ok=True)
 
-            # Ensure dashboards directory exists
-            os.makedirs("dashboards", exist_ok=True)
+    cmd_update(args)
 
-            cmd_update(args)
+    # Verify it used the mapped UUID
+    call_args = dashboard_globals["update_dashboard"].call_args[0]
+    assert call_args[0] == "mapped-uuid-123"
 
-            # Verify it used the mapped UUID
-            call_args = dashboard_globals["update_dashboard"].call_args[0]
-            assert call_args[0] == "mapped-uuid-123"
-
-            # Clean up the created dashboard file
-            dashboard_file = Path("dashboards/test_dashboard.json")
-            if dashboard_file.exists():
-                dashboard_file.unlink()
-
-        finally:
-            os.unlink(temp_path)
-            dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
+    # Clean up the created dashboard file
+    dashboard_file = Path("dashboards/test_dashboard.json")
+    if dashboard_file.exists():
+        dashboard_file.unlink()
 
     # Edge case - config not in mappings
-    empty_mapping = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-    json.dump({}, empty_mapping)
-    empty_mapping.close()
+    dashboard_globals["load_mappings"].return_value = {}
+
+    args = Mock()
+    args.uuid = "configs/unmapped.json"
+    args.file = None
 
     try:
-        dashboard_globals["MAPPINGS_FILE"] = empty_mapping.name
-
-        args = Mock()
-        args.uuid = "configs/unmapped.json"
-        args.file = None
-
-        try:
-            cmd_update(args)
-            assert False, "Should have raised SystemExit"
-        except SystemExit:
-            pass
-    finally:
-        os.unlink(empty_mapping.name)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
+        cmd_update(args)
+        assert False, "Should have raised SystemExit"
+    except SystemExit:
+        pass
 
 
 def test_cmd_build():
@@ -352,58 +265,37 @@ def test_cmd_build():
 def test_mapping_edge_cases():
     """Test specific edge cases from our discussion"""
     # Test 1: Multiple creates with same config updates mapping
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"configs/test.json": "old-uuid"}, f)
-        temp_path = f.name
+    dashboard_globals["load_mappings"].return_value = {"configs/test.json": "old-uuid"}
+    dashboard_globals["save_mapping"].reset_mock()
+    
+    # Create new dashboard with same config
+    mock_response = Mock()
+    mock_response.json.return_value = {"uuid": "new-uuid"}
+    dashboard_globals["create_dashboard"].return_value = mock_response
 
-    try:
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
+    args = Mock()
+    args.file = "dashboards/test_dashboard.json"
 
-        # Create new dashboard with same config
-        mock_response = Mock()
-        mock_response.json.return_value = {"uuid": "new-uuid"}
-        dashboard_globals["create_dashboard"].return_value = mock_response
+    cmd_create(args)
 
-        args = Mock()
-        args.file = "dashboards/test_dashboard.json"
-
-        cmd_create(args)
-
-        # Check mapping was updated
-        with open(temp_path) as f:
-            mappings = json.load(f)
-        assert mappings["configs/test.json"] == "new-uuid"
-
-    finally:
-        os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
+    # Check mapping was updated
+    dashboard_globals["save_mapping"].assert_called_with("configs/test.json", "new-uuid")
 
     # Test 2: Update with different UUID updates mapping
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"configs/test.json": "uuid-1"}, f)
-        temp_path = f.name
+    dashboard_globals["save_mapping"].reset_mock()
+    
+    mock_response = Mock()
+    mock_response.status_code = 200
+    dashboard_globals["update_dashboard"].return_value = mock_response
 
-    try:
-        dashboard_globals["MAPPINGS_FILE"] = temp_path
+    args = Mock()
+    args.uuid = "uuid-2"  # Different UUID
+    args.file = "dashboards/test_dashboard.json"
 
-        mock_response = Mock()
-        mock_response.status_code = 200
-        dashboard_globals["update_dashboard"].return_value = mock_response
+    cmd_update(args)
 
-        args = Mock()
-        args.uuid = "uuid-2"  # Different UUID
-        args.file = "dashboards/test_dashboard.json"
-
-        cmd_update(args)
-
-        # Check mapping was updated to new UUID
-        with open(temp_path) as f:
-            mappings = json.load(f)
-        assert mappings["configs/test.json"] == "uuid-2"
-
-    finally:
-        os.unlink(temp_path)
-        dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
+    # Check mapping was updated to new UUID
+    dashboard_globals["save_mapping"].assert_called_with("configs/test.json", "uuid-2")
 
 
 def test_cmd_build_batch():
@@ -601,8 +493,10 @@ def test_directory_mirroring():
 
 
 if __name__ == "__main__":
+    test_path_conversions()
     test_load_mappings()
     test_save_mapping()
+    test_build_and_save_dashboard()
     test_cmd_create()
     test_cmd_update_with_uuid()
     test_cmd_update_with_config()

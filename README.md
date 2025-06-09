@@ -10,9 +10,14 @@ Requires Python 3.12+:
 pip install -e .
 ```
 
-Set your Glassnode API key:
+Set your Glassnode API key via environment variable or `.env` file:
 ```bash
 export GLASSNODE_API_KEY=your_api_key_here
+```
+
+Or create a `.env` file:
+```
+GLASSNODE_API_KEY=your_api_key_here
 ```
 
 ## Usage
@@ -25,6 +30,13 @@ export GLASSNODE_API_KEY=your_api_key_here
 
 This generates a complete dashboard specification in `dashboards/my_dashboard_dashboard.json`.
 
+Build all dashboards in a directory:
+```bash
+./dashboard build configs/examples/
+```
+
+Directory structure is preserved: `configs/examples/sub/` → `dashboards/examples/sub/`
+
 ### Create dashboard on Glassnode
 
 ```bash
@@ -32,6 +44,11 @@ This generates a complete dashboard specification in `dashboards/my_dashboard_da
 ```
 
 Creates the dashboard via API and saves the UUID mapping for future updates.
+
+Create all dashboards in a directory:
+```bash
+./dashboard create dashboards/examples/
+```
 
 ### Update existing dashboard
 
@@ -43,6 +60,12 @@ Using config path (recommended):
 Using UUID directly:
 ```bash
 ./dashboard update 123e4567-e89b-12d3-a456-426614174000 dashboards/my_dashboard_dashboard.json
+```
+
+Update all dashboards in a directory:
+```bash
+./dashboard update configs/examples/
+./dashboard update dashboards/examples/
 ```
 
 ## Configuration Format

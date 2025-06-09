@@ -1,0 +1,7 @@
+{
+  "SOL": {
+    "/derivatives/futures_*": {
+      "resolution": "24h"
+    }
+  }
+}

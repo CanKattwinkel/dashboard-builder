@@ -1,0 +1,13 @@
+{
+  "BTC": {
+    "lineColor": "#f7931a"
+
+  },
+  "ETH": {
+    "lineColor": "#627eea"
+
+  },
+  "SOL": {
+    "lineColor": "#00ffa3"
+  }
+}

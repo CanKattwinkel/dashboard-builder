@@ -1,0 +1,5 @@
+{
+  "configs/basic_example.json": "test-uuid-12345",
+  "configs/nav/btc/BTC_futures.json": "12c7f919-ec59-410d-44c5-c8850bd11bc7",
+  "configs/nav/sol/SOL_futures.json": "944d5d85-389f-4d2f-5ffa-2f2ca38600c3"
+}

@@ -50,6 +50,23 @@ def test_build_metric_config():
     )
     assert config.meta.currency == "EUR"
     assert config.extra.chartStyle == "line"
+    
+    # Test overlapping patterns - more specific pattern should win
+    # Test general futures pattern
+    config = build_metric_config(
+        metric_code="/derivatives/futures_volume",
+        asset="BTC"
+    )
+    assert config.extra.zoom == "1y"  # From /derivatives/futures_*
+    assert not hasattr(config.meta, "resolution") or config.meta.resolution == "24h"  # Default
+    
+    # Test specific funding rate pattern
+    config = build_metric_config(
+        metric_code="/derivatives/futures_funding_rate_all",
+        asset="BTC"
+    )
+    assert config.extra.zoom == "1m"  # From /derivatives/futures_funding_rate_*
+    assert config.meta.resolution == "1h"  # From /derivatives/futures_funding_rate_*
 
     # Failing case - missing required asset
     try:

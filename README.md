@@ -43,7 +43,7 @@ Directory structure is preserved: `configs/examples/sub/` → `dashboards/exampl
 ./dash create dashboards/my_dashboard_dashboard.json
 ```
 
-Creates the dashboard via API and saves the UUID mapping for future updates.
+Creates the dashboard via API and saves the UUID mapping for future updates. If a dashboard already exists for the corresponding config file, it will update the existing dashboard instead of creating a duplicate.
 
 Create all dashboards in a directory:
 ```bash

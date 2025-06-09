@@ -16,6 +16,7 @@ from dashboard_client import (
     update_dashboard,
     create_dashboards,
     update_dashboards,
+    create_or_update_dashboard,
     API_KEY,
     load_mappings,
     save_mapping,
@@ -212,13 +213,47 @@ def test_api_key_handling():
         assert mock_put.call_args[1]["params"]["api_key"] == API_KEY
 
 
+def test_create_or_update_dashboard():
+    """Test create_or_update_dashboard function"""
+    # Test create case - no existing mapping
+    with (
+        mock.patch("dashboard_client.create_dashboard") as mock_create,
+        mock.patch("dashboard_client.update_dashboard") as mock_update,
+        mock.patch("dashboard_client.load_mappings", return_value={})
+    ):
+        mock_create.return_value = mock.Mock(status_code=201, json=lambda: {"uuid": "new-uuid"})
+        
+        response = create_or_update_dashboard("dashboards/test_dashboard.json")
+        
+        assert response.status_code == 201
+        mock_create.assert_called_once()
+        mock_update.assert_not_called()
+    
+    # Test update case - existing mapping
+    with (
+        mock.patch("dashboard_client.create_dashboard") as mock_create,
+        mock.patch("dashboard_client.update_dashboard") as mock_update,
+        mock.patch("dashboard_client.load_mappings", return_value={"configs/test.json": "existing-uuid"})
+    ):
+        mock_update.return_value = mock.Mock(status_code=200, json=lambda: {"uuid": "existing-uuid"})
+        
+        response = create_or_update_dashboard("dashboards/test_dashboard.json")
+        
+        assert response.status_code == 200
+        mock_update.assert_called_once_with("existing-uuid", Path("dashboards/test_dashboard.json"))
+        mock_create.assert_not_called()
+
+
 def test_create_dashboards():
     """Test creating multiple dashboards"""
     # Suppress print statements during test
     f = io.StringIO()
 
     # Expected use - successful batch creation from list
-    with mock.patch("dashboard_client.create_dashboard") as mock_create:
+    with (
+        mock.patch("dashboard_client.create_dashboard") as mock_create,
+        mock.patch("dashboard_client.load_mappings", return_value={})  # No existing dashboards
+    ):
         # Mock successful responses
         mock_create.side_effect = [
             mock.Mock(status_code=200, json=lambda: {"uuid": "uuid-1"}),
@@ -244,7 +279,10 @@ def test_create_dashboards():
             assert mock_create.call_count == 3
 
     # Expected use - from directory
-    with mock.patch("dashboard_client.create_dashboard") as mock_create:
+    with (
+        mock.patch("dashboard_client.create_dashboard") as mock_create,
+        mock.patch("dashboard_client.load_mappings", return_value={})
+    ):
         mock_create.return_value = mock.Mock(status_code=201, json=lambda: {"uuid": "new-uuid"})
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -260,7 +298,10 @@ def test_create_dashboards():
             assert mock_create.call_count == 2
 
     # Edge case - single file path (not a list or directory)
-    with mock.patch("dashboard_client.create_dashboard") as mock_create:
+    with (
+        mock.patch("dashboard_client.create_dashboard") as mock_create,
+        mock.patch("dashboard_client.load_mappings", return_value={})
+    ):
         mock_create.return_value = mock.Mock(status_code=201)
 
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
@@ -275,7 +316,10 @@ def test_create_dashboards():
             os.unlink(temp_file)
 
     # Edge case - mix of successful and failed creations
-    with mock.patch("dashboard_client.create_dashboard") as mock_create:
+    with (
+        mock.patch("dashboard_client.create_dashboard") as mock_create,
+        mock.patch("dashboard_client.load_mappings", return_value={})
+    ):
         # First succeeds, second fails, third succeeds
         mock_create.side_effect = [mock.Mock(status_code=201), Exception("API Error"), mock.Mock(status_code=201)]
 
@@ -298,16 +342,37 @@ def test_create_dashboards():
             assert error_count == 1
 
     # Failing case - empty directory
-    with tempfile.TemporaryDirectory() as temp_dir:
-        responses = create_dashboards(temp_dir)
-        assert len(responses) == 0  # Empty dict, not an error
+    with mock.patch("dashboard_client.load_mappings", return_value={}):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            responses = create_dashboards(temp_dir)
+            assert len(responses) == 0  # Empty dict, not an error
 
     # Edge case - directory doesn't exist but treated as file path
     # When a non-existent path is provided, it's treated as a single file
-    responses = create_dashboards("/nonexistent/directory")
-    assert len(responses) == 1  # One failed response
-    assert Path("/nonexistent/directory") in responses
-    assert responses[Path("/nonexistent/directory")].status_code == 500
+    with mock.patch("dashboard_client.load_mappings", return_value={}):
+        responses = create_dashboards("/nonexistent/directory")
+        assert len(responses) == 1  # One failed response
+        assert Path("/nonexistent/directory") in responses
+        assert responses[Path("/nonexistent/directory")].status_code == 500
+    
+    # Test with create_or_update_dashboard mock
+    with mock.patch("dashboard_client.create_or_update_dashboard") as mock_create_or_update:
+        mock_create_or_update.side_effect = [
+            mock.Mock(status_code=201, json=lambda: {"uuid": "uuid-1"}),
+            mock.Mock(status_code=200, json=lambda: {"uuid": "uuid-2"}),
+        ]
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            
+            # Create test dashboard files
+            (temp_path / "dash1.json").write_text('{"name": "Dashboard 1"}')
+            (temp_path / "dash2.json").write_text('{"name": "Dashboard 2"}')
+            
+            responses = create_dashboards(temp_dir)
+            
+            assert len(responses) == 2
+            assert mock_create_or_update.call_count == 2
 
 
 def test_update_dashboards():

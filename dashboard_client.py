@@ -103,6 +103,39 @@ def create_dashboard(
     return response
 
 
+def create_or_update_dashboard(
+    dashboard_data: Union[Dict[str, Any], str, Path], category_uuid: str = "My Dashboards"
+) -> requests.Response:
+    """
+    Create or update a dashboard based on existing mappings.
+    
+    Args:
+        dashboard_data: Either a dict with dashboard config or path to JSON file
+        category_uuid: Category for the dashboard (default: "My Dashboards")
+        
+    Returns:
+        Response object from the API call
+    """
+    # Convert to Path if string
+    if isinstance(dashboard_data, str):
+        dashboard_data = Path(dashboard_data)
+        
+    # If it's a Path, check mappings
+    if isinstance(dashboard_data, Path):
+        mappings = load_mappings()
+        # Derive config path from dashboard path
+        config_path = str(Path(str(dashboard_data.parent).replace("dashboards", "configs", 1)) / 
+                         (dashboard_data.stem.replace("_dashboard", "") + ".json"))
+        
+        if config_path in mappings:
+            uuid = mappings[config_path]
+            print(f"ℹ Dashboard already exists for {config_path}, updating instead...")
+            return update_dashboard(uuid, dashboard_data)
+    
+    # Otherwise create new
+    return create_dashboard(dashboard_data, category_uuid)
+
+
 def create_dashboards(
     dashboard_files: Union[List[Union[str, Path]], str, Path], category_uuid: str = "My Dashboards"
 ) -> Dict[Path, requests.Response]:
@@ -139,11 +172,11 @@ def create_dashboards(
     for file_path in dashboard_files:
         file_path = Path(file_path)
         try:
-            response = create_dashboard(file_path, category_uuid)
+            response = create_or_update_dashboard(file_path, category_uuid)
             responses[file_path] = response
-            print(f"✓ Created dashboard from {file_path}")
+            print(f"✓ Processed dashboard from {file_path}")
         except Exception as e:
-            print(f"✗ Failed to create dashboard from {file_path}: {e}")
+            print(f"✗ Failed to process dashboard from {file_path}: {e}")
 
             # Store the exception as a mock response for consistency
             class ErrorResponse:

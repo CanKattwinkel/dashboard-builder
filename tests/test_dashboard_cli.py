@@ -23,6 +23,7 @@ dashboard_globals = {
     "update_dashboard": mock_dashboard_client.update_dashboard,
     "create_dashboards": mock_dashboard_client.create_dashboards,
     "update_dashboards": mock_dashboard_client.update_dashboards,
+    "create_or_update_dashboard": mock_dashboard_client.create_or_update_dashboard,
     "load_mappings": mock_dashboard_client.load_mappings,
     "save_mapping": mock_dashboard_client.save_mapping,
     "MAPPINGS_FILE": ".dashboard_mappings.json",
@@ -39,7 +40,7 @@ with open(dashboard_path, "r") as f:
         "from dashboard_builder import build_dashboard_from_file, build_dashboards_from_directory", ""
     )
     dashboard_code = dashboard_code.replace(
-        "from dashboard_client import (\n    create_dashboard, update_dashboard, create_dashboards, update_dashboards,\n    load_mappings, save_mapping, MAPPINGS_FILE\n)",
+        "from dashboard_client import (\n    create_dashboard, update_dashboard, create_dashboards, update_dashboards,\n    create_or_update_dashboard, load_mappings, save_mapping, MAPPINGS_FILE\n)",
         "",
     )
     exec(dashboard_code, dashboard_globals)
@@ -115,7 +116,7 @@ def test_cmd_create():
     mock_response.status_code = 201
     mock_response.json.return_value = {"uuid": "created-uuid-123"}
 
-    dashboard_globals["create_dashboard"].return_value = mock_response
+    dashboard_globals["create_or_update_dashboard"].return_value = mock_response
 
     # Mock save_mapping
     dashboard_globals["save_mapping"].reset_mock()
@@ -133,7 +134,7 @@ def test_cmd_create():
     mock_response.status_code = 201
     mock_response.json.return_value = {}  # No UUID
 
-    dashboard_globals["create_dashboard"].return_value = mock_response
+    dashboard_globals["create_or_update_dashboard"].return_value = mock_response
     dashboard_globals["save_mapping"].reset_mock()
 
     args = Mock()
@@ -145,7 +146,7 @@ def test_cmd_create():
     dashboard_globals["save_mapping"].assert_not_called()
 
     # Failing case - API error
-    dashboard_globals["create_dashboard"].side_effect = Exception("API Error")
+    dashboard_globals["create_or_update_dashboard"].side_effect = Exception("API Error")
 
     args = Mock()
     args.file = "dashboard.json"
@@ -156,7 +157,7 @@ def test_cmd_create():
     except SystemExit:
         pass
     finally:
-        dashboard_globals["create_dashboard"].side_effect = None
+        dashboard_globals["create_or_update_dashboard"].side_effect = None
 
 
 def test_cmd_update_with_uuid():
@@ -263,22 +264,19 @@ def test_cmd_build():
 
 def test_mapping_edge_cases():
     """Test specific edge cases from our discussion"""
-    # Test 1: Multiple creates with same config updates mapping
-    dashboard_globals["load_mappings"].return_value = {"configs/test.json": "old-uuid"}
-    dashboard_globals["save_mapping"].reset_mock()
-
-    # Create new dashboard with same config
+    # Test that create_or_update_dashboard is used and mappings are saved
     mock_response = Mock()
-    mock_response.json.return_value = {"uuid": "new-uuid"}
-    dashboard_globals["create_dashboard"].return_value = mock_response
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"uuid": "some-uuid"}
+    dashboard_globals["create_or_update_dashboard"].return_value = mock_response
 
     args = Mock()
     args.file = "dashboards/test_dashboard.json"
 
     cmd_create(args)
 
-    # Check mapping was updated
-    dashboard_globals["save_mapping"].assert_called_with("configs/test.json", "new-uuid")
+    # Check create_or_update was called
+    dashboard_globals["create_or_update_dashboard"].assert_called_with("dashboards/test_dashboard.json")
 
     # Test 2: Update with different UUID updates mapping
     dashboard_globals["save_mapping"].reset_mock()
@@ -369,12 +367,13 @@ def test_cmd_create_batch():
 
     # Edge case - some creates fail
     mock_responses_with_failures = {
-        Path("dashboards/dash1.json"): Mock(status_code=201, json=Mock(return_value={"uuid": "uuid-1"})),
+        Path("dashboards/dash1.json"): Mock(status_code=200, json=Mock(return_value={"uuid": "uuid-1"})),
         Path("dashboards/dash2.json"): Mock(status_code=500, json=Mock(return_value={"error": "Server error"})),
-        Path("dashboards/dash3.json"): Mock(status_code=201, json=Mock(return_value={"uuid": "uuid-3"})),
+        Path("dashboards/dash3.json"): Mock(status_code=200, json=Mock(return_value={"uuid": "uuid-3"})),
     }
 
     dashboard_globals["create_dashboards"].return_value = mock_responses_with_failures
+    dashboard_globals["load_mappings"].return_value = {}
 
     with patch("pathlib.Path.is_dir", return_value=True), patch("builtins.open", mock_open(read_data="{}")):
         cmd_create(args)

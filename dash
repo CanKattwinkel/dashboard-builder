@@ -33,7 +33,7 @@ from pathlib import Path
 from dashboard_builder import build_dashboard_from_file, build_dashboards_from_directory
 from dashboard_client import (
     create_dashboard, update_dashboard, create_dashboards, update_dashboards,
-    load_mappings, save_mapping, MAPPINGS_FILE
+    create_or_update_dashboard, load_mappings, save_mapping, MAPPINGS_FILE
 )
 
 
@@ -114,38 +114,33 @@ def cmd_create(args):
             # Batch create
             responses = create_dashboards(dashboard_path)
             
-            created_count = 0
+            # Save mappings for successful operations
             mappings = load_mappings()
-            
             for file_path, response in responses.items():
                 if response.status_code == 200 and response.json().get('uuid'):
                     uuid = response.json()['uuid']
-                    
-                    # Derive config path from dashboard path
                     config_path = dashboard_to_config_path(file_path)
-                    
                     mappings[config_path] = uuid
-                    created_count += 1
                     print(f"  UUID: {uuid} → {config_path}")
             
             # Save all mappings at once
             with open(MAPPINGS_FILE, "w") as f:
                 json.dump(mappings, f, indent=2)
             
-            print(f"\n✓ Created {created_count} dashboards from {dashboard_path}")
+            # Report results
+            success_count = sum(1 for r in responses.values() if r.status_code == 200)
+            print(f"\n✓ Processed {success_count} dashboards from {dashboard_path}")
         else:
             # Single file create
-            response = create_dashboard(args.file)
-            print(f"✓ Dashboard created (status: {response.status_code})")
+            response = create_or_update_dashboard(args.file)
+            print(f"✓ Dashboard processed (status: {response.status_code})")
             
             if response.json() and response.json().get('uuid'):
                 uuid = response.json()['uuid']
                 print(f"  UUID: {uuid}")
                 
-                # Derive config path from dashboard path
-                config_path = dashboard_to_config_path(dashboard_path)
-                
                 # Save mapping
+                config_path = dashboard_to_config_path(dashboard_path)
                 save_mapping(config_path, uuid)
                 print(f"  Saved mapping: {config_path} → {uuid}")
     except Exception as e:

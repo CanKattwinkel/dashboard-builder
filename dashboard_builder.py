@@ -403,3 +403,44 @@ def build_dashboard_from_file(file_path: Union[str, Path]) -> Dashboard:
         asset=spec.get("asset"),
         dashboard_overrides=spec.get("dashboardOverrides", spec.get("common_overrides")),
     )
+
+
+def build_dashboards_from_directory(
+    directory_path: Union[str, Path], pattern: str = "*.json"
+) -> Dict[Path, Dashboard]:
+    """
+    Creates dashboards from all JSON specification files in a directory.
+
+    Args:
+        directory_path: Path to the directory containing JSON specification files
+        pattern: Glob pattern for finding JSON files (default: "*.json")
+
+    Returns:
+        Dictionary mapping file paths to Dashboard objects
+
+    Example:
+        dashboards = build_dashboards_from_directory("configs/examples")
+        for file_path, dashboard in dashboards.items():
+            print(f"Built {dashboard.meta.name} from {file_path}")
+    """
+    directory_path = Path(directory_path)
+    
+    if not directory_path.is_dir():
+        raise ValueError(f"Not a directory: {directory_path}")
+    
+    dashboards = {}
+    json_files = list(directory_path.glob(pattern))
+    
+    if not json_files:
+        raise ValueError(f"No JSON files found in {directory_path} matching pattern '{pattern}'")
+    
+    for json_file in json_files:
+        try:
+            dashboard = build_dashboard_from_file(json_file)
+            dashboards[json_file] = dashboard
+        except Exception as e:
+            # Log error but continue with other files
+            print(f"Error building dashboard from {json_file}: {e}")
+            continue
+    
+    return dashboards

@@ -23,7 +23,10 @@ dashboard_globals = {
     "dashboard_builder": mock_dashboard_builder,
     "create_dashboard": mock_dashboard_client.create_dashboard,
     "update_dashboard": mock_dashboard_client.update_dashboard,
+    "create_dashboards": mock_dashboard_client.create_dashboards,
+    "update_dashboards": mock_dashboard_client.update_dashboards,
     "build_dashboard_from_file": mock_dashboard_builder.build_dashboard_from_file,
+    "build_dashboards_from_directory": mock_dashboard_builder.build_dashboards_from_directory,
 }
 
 dashboard_path = Path(__file__).parent.parent / "dashboard"
@@ -31,8 +34,8 @@ with open(dashboard_path, "r") as f:
     dashboard_code = f.read()
     # Prevent main from running and adjust imports
     dashboard_code = dashboard_code.replace('if __name__ == "__main__":', "if False:")
-    dashboard_code = dashboard_code.replace('from dashboard_builder import build_dashboard_from_file', '')
-    dashboard_code = dashboard_code.replace('from dashboard_client import create_dashboard, update_dashboard', '')
+    dashboard_code = dashboard_code.replace('from dashboard_builder import build_dashboard_from_file, build_dashboards_from_directory', '')
+    dashboard_code = dashboard_code.replace('from dashboard_client import create_dashboard, update_dashboard, create_dashboards, update_dashboards', '')
     exec(dashboard_code, dashboard_globals)
 
 # Extract functions we need to test
@@ -399,6 +402,215 @@ def test_mapping_edge_cases():
         dashboard_globals["MAPPINGS_FILE"] = ".dashboard_mappings.json"
 
 
+def test_cmd_build_batch():
+    """Test batch build command for directories"""
+    # Expected use - build multiple dashboards from directory
+    mock_dashboards = {
+        Path("configs/examples/dash1.json"): Mock(
+            meta=Mock(name="Dashboard 1"),
+            configs=[Mock()],
+            model_dump=Mock(return_value={"name": "Dashboard 1"})
+        ),
+        Path("configs/examples/dash2.json"): Mock(
+            meta=Mock(name="Dashboard 2"),
+            configs=[Mock(), Mock()],
+            model_dump=Mock(return_value={"name": "Dashboard 2"})
+        ),
+    }
+    
+    dashboard_globals["build_dashboards_from_directory"].return_value = mock_dashboards
+    
+    args = Mock()
+    args.config = "configs/examples"
+    
+    # Mock Path.is_dir to return True
+    with patch("pathlib.Path.is_dir", return_value=True), \
+         patch("pathlib.Path.mkdir"), \
+         patch("builtins.open", mock_open()):
+        
+        cmd_build(args)
+        
+        # Verify build_dashboards_from_directory was called
+        dashboard_globals["build_dashboards_from_directory"].assert_called_once_with(Path("configs/examples"))
+    
+    # Edge case - empty directory (no dashboards built)
+    dashboard_globals["build_dashboards_from_directory"].return_value = {}
+    
+    with patch("pathlib.Path.is_dir", return_value=True):
+        cmd_build(args)
+        # Should complete without error, print 0 dashboards built
+    
+    # Failing case - directory doesn't exist
+    dashboard_globals["build_dashboards_from_directory"].side_effect = ValueError("Not a directory")
+    
+    with patch("pathlib.Path.is_dir", return_value=True):
+        try:
+            cmd_build(args)
+            assert False, "Should have raised SystemExit"
+        except SystemExit:
+            pass
+    
+    dashboard_globals["build_dashboards_from_directory"].side_effect = None
+
+
+def test_cmd_create_batch():
+    """Test batch create command for directories"""
+    # Expected use - create multiple dashboards
+    mock_responses = {
+        Path("dashboards/examples/dash1.json"): Mock(
+            status_code=200,
+            json=Mock(return_value={"uuid": "uuid-1"})
+        ),
+        Path("dashboards/examples/dash2.json"): Mock(
+            status_code=200,
+            json=Mock(return_value={"uuid": "uuid-2"})
+        ),
+    }
+    
+    dashboard_globals["create_dashboards"].return_value = mock_responses
+    dashboard_globals["load_mappings"].return_value = {}
+    
+    args = Mock()
+    args.file = "dashboards/examples"
+    
+    with patch("pathlib.Path.is_dir", return_value=True), \
+         patch("builtins.open", mock_open(read_data="{}")):
+        
+        cmd_create(args)
+        
+        # Verify create_dashboards was called
+        dashboard_globals["create_dashboards"].assert_called_once_with(Path("dashboards/examples"))
+    
+    # Edge case - some creates fail
+    mock_responses_with_failures = {
+        Path("dashboards/dash1.json"): Mock(status_code=201, json=Mock(return_value={"uuid": "uuid-1"})),
+        Path("dashboards/dash2.json"): Mock(status_code=500, json=Mock(return_value={"error": "Server error"})),
+        Path("dashboards/dash3.json"): Mock(status_code=201, json=Mock(return_value={"uuid": "uuid-3"})),
+    }
+    
+    dashboard_globals["create_dashboards"].return_value = mock_responses_with_failures
+    
+    with patch("pathlib.Path.is_dir", return_value=True), \
+         patch("builtins.open", mock_open(read_data="{}")):
+        
+        cmd_create(args)
+        # Should handle partial failures gracefully
+    
+    # Failing case - API error
+    dashboard_globals["create_dashboards"].side_effect = Exception("Network error")
+    
+    with patch("pathlib.Path.is_dir", return_value=True):
+        try:
+            cmd_create(args)
+            assert False, "Should have raised SystemExit"
+        except SystemExit:
+            pass
+    
+    dashboard_globals["create_dashboards"].side_effect = None
+
+
+def test_cmd_update_batch():
+    """Test batch update command for directories"""
+    # Expected use - update from configs directory
+    mock_dashboards = {
+        Path("configs/examples/dash1.json"): Mock(
+            model_dump=Mock(return_value={"name": "Dashboard 1"})
+        ),
+        Path("configs/examples/dash2.json"): Mock(
+            model_dump=Mock(return_value={"name": "Dashboard 2"})
+        ),
+    }
+    
+    mock_update_responses = {
+        "uuid-1": Mock(status_code=200),
+        "uuid-2": Mock(status_code=200),
+    }
+    
+    dashboard_globals["build_dashboards_from_directory"].return_value = mock_dashboards
+    dashboard_globals["update_dashboards"].return_value = mock_update_responses
+    
+    args = Mock()
+    args.uuid = "configs/examples"
+    args.file = None
+    
+    with patch("pathlib.Path.is_dir", return_value=True), \
+         patch("pathlib.Path.mkdir"), \
+         patch("builtins.open", mock_open(read_data="{}")):
+        
+        cmd_update(args)
+        
+        # Verify both build and update were called
+        # Reset call count since this is not the first test
+        assert dashboard_globals["build_dashboards_from_directory"].called
+        assert dashboard_globals["update_dashboards"].called
+    
+    # Expected use - update from dashboards directory
+    dashboard_globals["build_dashboards_from_directory"].reset_mock()
+    dashboard_globals["update_dashboards"].reset_mock()
+    
+    args.uuid = "dashboards/examples"
+    
+    with patch("pathlib.Path.is_dir", return_value=True):
+        cmd_update(args)
+        
+        # Should not build, just update
+        dashboard_globals["build_dashboards_from_directory"].assert_not_called()
+        dashboard_globals["update_dashboards"].assert_called_once_with(Path("dashboards/examples"))
+    
+    # Edge case - some updates fail
+    mock_update_responses_with_failures = {
+        "uuid-1": Mock(status_code=200),
+        "uuid-2": Mock(status_code=500),
+        "uuid-3": Mock(status_code=200),
+    }
+    
+    dashboard_globals["update_dashboards"].return_value = mock_update_responses_with_failures
+    
+    with patch("pathlib.Path.is_dir", return_value=True):
+        cmd_update(args)
+        # Should handle partial failures
+    
+    # Failing case - no mappings found
+    dashboard_globals["update_dashboards"].side_effect = ValueError("No mapped dashboards found")
+    
+    with patch("pathlib.Path.is_dir", return_value=True):
+        try:
+            cmd_update(args)
+            assert False, "Should have raised SystemExit"
+        except SystemExit:
+            pass
+    
+    dashboard_globals["update_dashboards"].side_effect = None
+
+
+def test_directory_mirroring():
+    """Test that directory structure is preserved configs/ -> dashboards/"""
+    # Test build preserves structure
+    mock_dashboard = Mock(
+        meta=Mock(name="Test Dashboard"),
+        configs=[Mock()],
+        model_dump=Mock(return_value={"test": "data"})
+    )
+    dashboard_globals["build_dashboard_from_file"].return_value = mock_dashboard
+    
+    args = Mock()
+    args.config = "configs/examples/subdirectory/test.json"
+    
+    with patch("pathlib.Path.is_dir", return_value=False), \
+         patch("pathlib.Path.mkdir") as mock_mkdir, \
+         patch("builtins.open", mock_open()) as mock_file:
+        
+        cmd_build(args)
+        
+        # Verify correct output path
+        expected_path = "dashboards/examples/subdirectory/test_dashboard.json"
+        calls = [str(call[0][0]) for call in mock_file.call_args_list if call[0]]
+        assert any(expected_path in call for call in calls)
+        
+        # Verify directories were created with parents=True
+        mock_mkdir.assert_called_with(parents=True, exist_ok=True)
+
+
 if __name__ == "__main__":
     test_load_mappings()
     test_save_mapping()
@@ -407,4 +619,8 @@ if __name__ == "__main__":
     test_cmd_update_with_config()
     test_cmd_build()
     test_mapping_edge_cases()
+    test_cmd_build_batch()
+    test_cmd_create_batch() 
+    test_cmd_update_batch()
+    test_directory_mirroring()
     print("All dashboard CLI tests passed!")

@@ -8,7 +8,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from dashboard_builder import build_dashboard, build_dashboard_from_file, build_metric_config, generate_layout
+from dashboard_builder import build_dashboard, build_dashboard_from_file, build_metric_config, generate_layout, build_dashboards_from_directory
 
 
 def test_build_metric_config():
@@ -317,9 +317,132 @@ def test_build_dashboard_from_file():
         Path(temp_path).unlink()
 
 
+def test_build_dashboards_from_directory():
+    """Test building multiple dashboards from a directory"""
+    # Expected use - directory with multiple JSON files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        # Create test JSON files
+        config1 = {"name": "Dashboard 1", "asset": "BTC", "metrics": ["/market/price"]}
+        config2 = {"name": "Dashboard 2", "asset": "ETH", "metrics": ["/market/volume", "/market/cap"]}
+        config3 = {"name": "Dashboard 3", "asset": "SOL", "metrics": []}
+        
+        (temp_path / "dash1.json").write_text(json.dumps(config1))
+        (temp_path / "dash2.json").write_text(json.dumps(config2))
+        (temp_path / "dash3.json").write_text(json.dumps(config3))
+        
+        # Also create a non-JSON file to ensure it's ignored
+        (temp_path / "readme.txt").write_text("This should be ignored")
+        
+        dashboards = build_dashboards_from_directory(temp_path)
+        
+        assert len(dashboards) == 3
+        
+        # Check each dashboard
+        paths = sorted(dashboards.keys(), key=lambda p: p.name)
+        assert paths[0].name == "dash1.json"
+        assert dashboards[paths[0]].meta.name == "Dashboard 1"
+        assert len(dashboards[paths[0]].configs) == 1
+        
+        assert paths[1].name == "dash2.json"
+        assert dashboards[paths[1]].meta.name == "Dashboard 2"
+        assert len(dashboards[paths[1]].configs) == 2
+        
+        assert paths[2].name == "dash3.json"
+        assert dashboards[paths[2]].meta.name == "Dashboard 3"
+        assert len(dashboards[paths[2]].configs) == 0
+    
+    # Expected use - custom pattern
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        # Create files with different patterns
+        config_prod = {"name": "Prod Dashboard", "asset": "BTC", "metrics": ["/market/price"]}
+        config_test = {"name": "Test Dashboard", "asset": "ETH", "metrics": ["/market/volume"]}
+        
+        (temp_path / "prod_dashboard.json").write_text(json.dumps(config_prod))
+        (temp_path / "test_dashboard.json").write_text(json.dumps(config_test))
+        
+        # Only get prod dashboards
+        dashboards = build_dashboards_from_directory(temp_path, pattern="prod_*.json")
+        
+        assert len(dashboards) == 1
+        assert list(dashboards.values())[0].meta.name == "Prod Dashboard"
+    
+    # Edge case - directory with one file
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        config = {"name": "Single Dashboard", "asset": "BTC", "metrics": ["/market/price"]}
+        (temp_path / "single.json").write_text(json.dumps(config))
+        
+        dashboards = build_dashboards_from_directory(temp_path)
+        
+        assert len(dashboards) == 1
+        assert list(dashboards.values())[0].meta.name == "Single Dashboard"
+    
+    # Edge case - some files have errors but others succeed
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        
+        # Valid config
+        valid_config = {"name": "Valid Dashboard", "asset": "BTC", "metrics": ["/market/price"]}
+        (temp_path / "valid.json").write_text(json.dumps(valid_config))
+        
+        # Invalid JSON
+        (temp_path / "invalid.json").write_text("{'bad': json, }")
+        
+        # Missing required field
+        missing_name = {"asset": "ETH", "metrics": []}
+        (temp_path / "missing_name.json").write_text(json.dumps(missing_name))
+        
+        dashboards = build_dashboards_from_directory(temp_path)
+        
+        # Should only have the valid dashboard
+        assert len(dashboards) == 1
+        assert list(dashboards.values())[0].meta.name == "Valid Dashboard"
+    
+    # Failing case - directory doesn't exist
+    try:
+        build_dashboards_from_directory("/nonexistent/directory")
+        assert False, "Should raise ValueError for non-existent directory"
+    except ValueError as e:
+        assert "Not a directory" in str(e)
+    
+    # Failing case - not a directory (file instead)
+    with tempfile.NamedTemporaryFile(suffix=".json") as f:
+        try:
+            build_dashboards_from_directory(f.name)
+            assert False, "Should raise ValueError for file instead of directory"
+        except ValueError as e:
+            assert "Not a directory" in str(e)
+    
+    # Failing case - empty directory (no JSON files)
+    with tempfile.TemporaryDirectory() as temp_dir:
+        try:
+            build_dashboards_from_directory(temp_dir)
+            assert False, "Should raise ValueError for empty directory"
+        except ValueError as e:
+            assert "No JSON files found" in str(e)
+    
+    # Failing case - directory with only non-matching files
+    with tempfile.TemporaryDirectory() as temp_dir:
+        temp_path = Path(temp_dir)
+        (temp_path / "data.yaml").write_text("yaml: content")
+        (temp_path / "config.toml").write_text("[config]")
+        
+        try:
+            build_dashboards_from_directory(temp_dir)
+            assert False, "Should raise ValueError when no JSON files found"
+        except ValueError as e:
+            assert "No JSON files found" in str(e)
+
+
 if __name__ == "__main__":
     test_build_metric_config()
     test_generate_layout()
     test_build_dashboard()
     test_build_dashboard_from_file()
+    test_build_dashboards_from_directory()
     print("All dashboard_builder tests passed!")

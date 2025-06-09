@@ -9,6 +9,7 @@ dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.0",
     "pytest>=8.4.0",
+    "pytest-cov>=6.1.1",
 ]
 
 [tool.ruff]

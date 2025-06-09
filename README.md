@@ -25,14 +25,14 @@ GLASSNODE_API_KEY=your_api_key_here
 ### Build a dashboard from configuration
 
 ```bash
-./dashboard build configs/my_dashboard.json
+./dash build configs/my_dashboard.json
 ```
 
 This generates a complete dashboard specification in `dashboards/my_dashboard_dashboard.json`.
 
 Build all dashboards in a directory:
 ```bash
-./dashboard build configs/examples/
+./dash build configs/examples/
 ```
 
 Directory structure is preserved: `configs/examples/sub/` → `dashboards/examples/sub/`
@@ -40,32 +40,32 @@ Directory structure is preserved: `configs/examples/sub/` → `dashboards/exampl
 ### Create dashboard on Glassnode
 
 ```bash
-./dashboard create dashboards/my_dashboard_dashboard.json
+./dash create dashboards/my_dashboard_dashboard.json
 ```
 
 Creates the dashboard via API and saves the UUID mapping for future updates.
 
 Create all dashboards in a directory:
 ```bash
-./dashboard create dashboards/examples/
+./dash create dashboards/examples/
 ```
 
 ### Update existing dashboard
 
 Using config path (recommended):
 ```bash
-./dashboard update configs/my_dashboard.json
+./dash update configs/my_dashboard.json
 ```
 
 Using UUID directly:
 ```bash
-./dashboard update 123e4567-e89b-12d3-a456-426614174000 dashboards/my_dashboard_dashboard.json
+./dash update 123e4567-e89b-12d3-a456-426614174000 dashboards/my_dashboard_dashboard.json
 ```
 
 Update all dashboards in a directory:
 ```bash
-./dashboard update configs/examples/
-./dashboard update dashboards/examples/
+./dash update configs/examples/
+./dash update dashboards/examples/
 ```
 
 ## Configuration Format

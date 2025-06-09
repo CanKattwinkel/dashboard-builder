@@ -30,7 +30,7 @@ dashboard_globals = {
     "build_dashboards_from_directory": mock_dashboard_builder.build_dashboards_from_directory,
 }
 
-dashboard_path = Path(__file__).parent.parent / "dashboard"
+dashboard_path = Path(__file__).parent.parent / "dash"
 with open(dashboard_path, "r") as f:
     dashboard_code = f.read()
     # Prevent main from running and adjust imports

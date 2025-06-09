@@ -4,26 +4,26 @@ Dashboard management CLI - build, create, and update Glassnode dashboards
 
 Usage:
     # Build a dashboard from a configuration file
-    ./dashboard build configs/sol_futures.json
+    ./dash build configs/sol_futures.json
     
     # Build all dashboards in a directory
-    ./dashboard build configs/examples/
+    ./dash build configs/examples/
     
     # Create a new dashboard on Glassnode
-    ./dashboard create dashboards/sol_futures_dashboard.json
+    ./dash create dashboards/sol_futures_dashboard.json
     
     # Create all dashboards in a directory
-    ./dashboard create dashboards/examples/
+    ./dash create dashboards/examples/
     
     # Update an existing dashboard on Glassnode (with UUID)
-    ./dashboard update 29da04cd-1c9a-40a1-76e1-7df6faaf0a6a dashboards/sol_futures_dashboard.json
+    ./dash update 29da04cd-1c9a-40a1-76e1-7df6faaf0a6a dashboards/sol_futures_dashboard.json
     
     # Update an existing dashboard (auto-lookup UUID from config)
-    ./dashboard update configs/sol_futures.json
+    ./dash update configs/sol_futures.json
     
     # Update all dashboards in a directory
-    ./dashboard update configs/examples/
-    ./dashboard update dashboards/examples/
+    ./dash update configs/examples/
+    ./dash update dashboards/examples/
 """
 import argparse
 import sys

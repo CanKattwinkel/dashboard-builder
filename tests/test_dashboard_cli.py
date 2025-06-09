@@ -2,8 +2,6 @@
 
 import os
 import sys
-import json
-import tempfile
 from pathlib import Path
 
 # Add parent directory to path
@@ -41,7 +39,8 @@ with open(dashboard_path, "r") as f:
         "from dashboard_builder import build_dashboard_from_file, build_dashboards_from_directory", ""
     )
     dashboard_code = dashboard_code.replace(
-        "from dashboard_client import (\n    create_dashboard, update_dashboard, create_dashboards, update_dashboards,\n    load_mappings, save_mapping, MAPPINGS_FILE\n)", ""
+        "from dashboard_client import (\n    create_dashboard, update_dashboard, create_dashboards, update_dashboards,\n    load_mappings, save_mapping, MAPPINGS_FILE\n)",
+        "",
     )
     exec(dashboard_code, dashboard_globals)
 
@@ -60,12 +59,12 @@ def test_path_conversions():
     assert config_to_dashboard_path("configs/test.json") == Path("dashboards/test_dashboard.json")
     assert config_to_dashboard_path("configs/examples/test.json") == Path("dashboards/examples/test_dashboard.json")
     assert config_to_dashboard_path("configs/sub/dir/test.json") == Path("dashboards/sub/dir/test_dashboard.json")
-    
+
     # Test dashboard to config path
     assert dashboard_to_config_path("dashboards/test_dashboard.json") == "configs/test.json"
     assert dashboard_to_config_path("dashboards/examples/test_dashboard.json") == "configs/examples/test.json"
     assert dashboard_to_config_path("dashboards/sub/dir/test_dashboard.json") == "configs/sub/dir/test.json"
-    
+
     # Test round-trip conversion
     config_path = "configs/examples/complex_name.json"
     dashboard_path = config_to_dashboard_path(config_path)
@@ -75,13 +74,13 @@ def test_path_conversions():
 def test_load_mappings():
     """Test loading UUID mappings - now delegates to dashboard_client"""
     # The load_mappings is now imported from dashboard_client, so we just verify it's a mock
-    assert hasattr(dashboard_globals["load_mappings"], 'return_value'), "load_mappings should be a mock"
+    assert hasattr(dashboard_globals["load_mappings"], "return_value"), "load_mappings should be a mock"
 
 
 def test_save_mapping():
     """Test saving UUID mappings - now delegates to dashboard_client"""
     # The save_mapping is now imported from dashboard_client, so we just verify it's a mock
-    assert hasattr(dashboard_globals["save_mapping"], 'assert_called_with'), "save_mapping should be a mock"
+    assert hasattr(dashboard_globals["save_mapping"], "assert_called_with"), "save_mapping should be a mock"
 
 
 def test_build_and_save_dashboard():
@@ -92,17 +91,17 @@ def test_build_and_save_dashboard():
     mock_dashboard.configs = [Mock(), Mock()]
     mock_dashboard.model_dump.return_value = {"test": "data"}
     dashboard_globals["build_dashboard_from_file"].return_value = mock_dashboard
-    
+
     with patch("builtins.open", mock_open()) as mock_file, patch("pathlib.Path.mkdir"):
         # Test the function
         output_path, dashboard = build_and_save_dashboard("configs/test.json")
-        
+
         # Verify output path is correct
         assert output_path == Path("dashboards/test_dashboard.json")
-        
+
         # Verify dashboard was returned
         assert dashboard == mock_dashboard
-        
+
         # Verify file was written
         mock_file.assert_called()
         write_calls = mock_file().write.call_args_list
@@ -267,7 +266,7 @@ def test_mapping_edge_cases():
     # Test 1: Multiple creates with same config updates mapping
     dashboard_globals["load_mappings"].return_value = {"configs/test.json": "old-uuid"}
     dashboard_globals["save_mapping"].reset_mock()
-    
+
     # Create new dashboard with same config
     mock_response = Mock()
     mock_response.json.return_value = {"uuid": "new-uuid"}
@@ -283,7 +282,7 @@ def test_mapping_edge_cases():
 
     # Test 2: Update with different UUID updates mapping
     dashboard_globals["save_mapping"].reset_mock()
-    
+
     mock_response = Mock()
     mock_response.status_code = 200
     dashboard_globals["update_dashboard"].return_value = mock_response

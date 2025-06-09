@@ -12,8 +12,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import after setting env var
 from dashboard_client import (
-    create_dashboard, update_dashboard, create_dashboards, update_dashboards, 
-    API_KEY, load_mappings, save_mapping
+    create_dashboard,
+    update_dashboard,
+    create_dashboards,
+    update_dashboards,
+    API_KEY,
+    load_mappings,
+    save_mapping,
 )
 import requests
 import io
@@ -444,39 +449,39 @@ def test_update_dashboards():
 def test_mappings():
     """Test UUID mapping functions"""
     import dashboard_client
-    
+
     # Save original MAPPINGS_FILE value
     original_mappings_file = dashboard_client.MAPPINGS_FILE
-    
+
     # Expected use - save and load mappings
     temp_path = tempfile.mktemp(suffix=".json")
-    
+
     try:
         dashboard_client.MAPPINGS_FILE = temp_path
-        
+
         # Test loading empty file
         mappings = load_mappings()
         assert mappings == {}
-        
+
         # Test saving mapping
         save_mapping("configs/test.json", "uuid-123")
-        
+
         # Test loading saved mapping
         mappings = load_mappings()
         assert mappings["configs/test.json"] == "uuid-123"
-        
+
         # Test updating existing mapping
         save_mapping("configs/test.json", "new-uuid")
         mappings = load_mappings()
         assert mappings["configs/test.json"] == "new-uuid"
-        
+
         # Test adding another mapping
         save_mapping("configs/other.json", "uuid-456")
         mappings = load_mappings()
         assert len(mappings) == 2
         assert mappings["configs/test.json"] == "new-uuid"
         assert mappings["configs/other.json"] == "uuid-456"
-        
+
     finally:
         os.unlink(temp_path)
         dashboard_client.MAPPINGS_FILE = original_mappings_file

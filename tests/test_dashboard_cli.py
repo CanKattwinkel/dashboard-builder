@@ -497,37 +497,35 @@ def test_cmd_run_single():
     dashboard_globals["build_dashboard_from_file"].reset_mock()
     dashboard_globals["create_or_update_dashboard"].reset_mock()
     dashboard_globals["save_mapping"].reset_mock()
-    
+
     # Mock dashboard build
     mock_dashboard = Mock(
-        meta=Mock(name="Test Dashboard"), 
-        configs=[Mock(), Mock()], 
-        model_dump=Mock(return_value={"test": "data"})
+        meta=Mock(name="Test Dashboard"), configs=[Mock(), Mock()], model_dump=Mock(return_value={"test": "data"})
     )
     dashboard_globals["build_dashboard_from_file"].return_value = mock_dashboard
-    
+
     # Mock create_or_update response
     mock_response = Mock()
     mock_response.status_code = 200
     mock_response.json.return_value = {"uuid": "run-uuid-123"}
     dashboard_globals["create_or_update_dashboard"].return_value = mock_response
-    
+
     args = Mock()
     args.config = "configs/test.json"
-    
+
     with (
         patch("pathlib.Path.is_dir", return_value=False),
         patch("pathlib.Path.mkdir"),
-        patch("builtins.open", mock_open())
+        patch("builtins.open", mock_open()),
     ):
         cmd_run(args)
-        
+
         # Verify build was called
         dashboard_globals["build_dashboard_from_file"].assert_called_once()
-        
+
         # Verify deploy was called
         dashboard_globals["create_or_update_dashboard"].assert_called_once()
-        
+
         # Verify mapping was saved
         dashboard_globals["save_mapping"].assert_called_once_with("configs/test.json", "run-uuid-123")
 
@@ -538,13 +536,11 @@ def test_cmd_run_batch():
     dashboard_globals["build_dashboards_from_directory"].reset_mock()
     dashboard_globals["create_dashboards"].reset_mock()
     dashboard_globals["load_mappings"].reset_mock()
-    
+
     # Mock dashboard builds
     mock_dashboards = {
         Path("configs/examples/dash1.json"): Mock(
-            meta=Mock(name="Dashboard 1"), 
-            configs=[Mock()], 
-            model_dump=Mock(return_value={"name": "Dashboard 1"})
+            meta=Mock(name="Dashboard 1"), configs=[Mock()], model_dump=Mock(return_value={"name": "Dashboard 1"})
         ),
         Path("configs/examples/dash2.json"): Mock(
             meta=Mock(name="Dashboard 2"),
@@ -553,7 +549,7 @@ def test_cmd_run_batch():
         ),
     }
     dashboard_globals["build_dashboards_from_directory"].return_value = mock_dashboards
-    
+
     # Mock create_dashboards responses
     mock_responses = {
         Path("dashboards/examples/dash1.json"): Mock(status_code=200, json=Mock(return_value={"uuid": "uuid-1"})),
@@ -561,35 +557,35 @@ def test_cmd_run_batch():
     }
     dashboard_globals["create_dashboards"].return_value = mock_responses
     dashboard_globals["load_mappings"].return_value = {}
-    
+
     args = Mock()
     args.config = "configs/examples"
-    
+
     with (
         patch("pathlib.Path.is_dir", return_value=True),
         patch("pathlib.Path.mkdir"),
-        patch("builtins.open", mock_open(read_data="{}"))
+        patch("builtins.open", mock_open(read_data="{}")),
     ):
         cmd_run(args)
-        
+
         # Verify build was called
         dashboard_globals["build_dashboards_from_directory"].assert_called_once_with(Path("configs/examples"))
-        
+
         # Verify deploy was called
         dashboard_globals["create_dashboards"].assert_called_once()
-        
+
     # Test with some failures
     mock_responses_with_failures = {
         Path("dashboards/dash1.json"): Mock(status_code=200, json=Mock(return_value={"uuid": "uuid-1"})),
         Path("dashboards/dash2.json"): Mock(status_code=500, json=Mock(return_value={"error": "Server error"})),
     }
-    
+
     dashboard_globals["create_dashboards"].return_value = mock_responses_with_failures
-    
+
     with (
         patch("pathlib.Path.is_dir", return_value=True),
         patch("pathlib.Path.mkdir"),
-        patch("builtins.open", mock_open(read_data="{}"))
+        patch("builtins.open", mock_open(read_data="{}")),
     ):
         cmd_run(args)
         # Should complete even with partial failures

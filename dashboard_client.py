@@ -49,7 +49,7 @@ def update_dashboard(dashboard_uuid: str, dashboard_data: Union[Dict[str, Any], 
     """
     # Store the original dashboard_data path if it's a file
     original_data = dashboard_data
-    
+
     # Load from file if path provided
     if isinstance(dashboard_data, (str, Path)):
         with open(dashboard_data, "r") as f:
@@ -60,7 +60,7 @@ def update_dashboard(dashboard_uuid: str, dashboard_data: Union[Dict[str, Any], 
     try:
         response = requests.get(f"https://api.glassnode.com/v1/dashboards/{dashboard_uuid}", params=params)
         response.raise_for_status()
-        
+
         current_dashboard = response.json()
         category_uuid = current_dashboard.get("categoryUuid", DEFAULT_CATEGORY)
 
@@ -76,7 +76,7 @@ def update_dashboard(dashboard_uuid: str, dashboard_data: Union[Dict[str, Any], 
         response.raise_for_status()
 
         return response
-        
+
     except requests.HTTPError as e:
         if e.response.status_code == 404:
             # Dashboard doesn't exist, create a new one instead
@@ -87,9 +87,7 @@ def update_dashboard(dashboard_uuid: str, dashboard_data: Union[Dict[str, Any], 
             raise
 
 
-def create_dashboard(
-    dashboard_data: Union[Dict[str, Any], str, Path], category_uuid: str = None
-) -> requests.Response:
+def create_dashboard(dashboard_data: Union[Dict[str, Any], str, Path], category_uuid: str = None) -> requests.Response:
     """
     Create a new Glassnode dashboard via their API.
 
@@ -103,7 +101,7 @@ def create_dashboard(
     # Use default category if not specified
     if category_uuid is None:
         category_uuid = DEFAULT_CATEGORY
-        
+
     # Load from file if path provided
     if isinstance(dashboard_data, (str, Path)):
         with open(dashboard_data, "r") as f:
@@ -130,30 +128,32 @@ def create_or_update_dashboard(
 ) -> requests.Response:
     """
     Create or update a dashboard based on existing mappings.
-    
+
     Args:
         dashboard_data: Either a dict with dashboard config or path to JSON file
         category_uuid: Category for the dashboard (defaults to GLASSNODE_CATEGORY_UUID env var or "My Dashboards")
-        
+
     Returns:
         Response object from the API call
     """
     # Convert to Path if string
     if isinstance(dashboard_data, str):
         dashboard_data = Path(dashboard_data)
-        
+
     # If it's a Path, check mappings
     if isinstance(dashboard_data, Path):
         mappings = load_mappings()
         # Derive config path from dashboard path
-        config_path = str(Path(str(dashboard_data.parent).replace("dashboards", "configs", 1)) / 
-                         (dashboard_data.stem.replace("_dashboard", "") + ".json"))
-        
+        config_path = str(
+            Path(str(dashboard_data.parent).replace("dashboards", "configs", 1))
+            / (dashboard_data.stem.replace("_dashboard", "") + ".json")
+        )
+
         if config_path in mappings:
             uuid = mappings[config_path]
             print(f"ℹ Dashboard already exists for {config_path}, updating instead...")
             return update_dashboard(uuid, dashboard_data)
-    
+
     # Otherwise create new
     return create_dashboard(dashboard_data, category_uuid)
 

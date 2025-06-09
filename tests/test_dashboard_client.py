@@ -46,6 +46,7 @@ def test_create_dashboard():
         assert call_args[1]["json"]["data"] == dashboard_data
         # Should use DEFAULT_CATEGORY from dashboard_client
         import dashboard_client
+
         assert call_args[1]["json"]["categoryUuid"] == dashboard_client.DEFAULT_CATEGORY
         assert response.json()["uuid"] == "new-uuid-123"
 
@@ -168,25 +169,26 @@ def test_update_dashboard():
         put_json = mock_put.call_args[1]["json"]
         # Should use DEFAULT_CATEGORY from dashboard_client
         import dashboard_client
+
         assert put_json["categoryUuid"] == dashboard_client.DEFAULT_CATEGORY
 
     # Failing case - dashboard not found (404) - should create new
     with (
         mock.patch("dashboard_client.requests.get") as mock_get,
-        mock.patch("dashboard_client.create_dashboard") as mock_create
+        mock.patch("dashboard_client.create_dashboard") as mock_create,
     ):
         mock_get_resp = mock.Mock()
         mock_get_resp.raise_for_status.side_effect = requests.HTTPError(response=mock.Mock(status_code=404))
         mock_get.return_value = mock_get_resp
-        
+
         mock_create.return_value = mock.Mock(status_code=201, json=lambda: {"uuid": "new-uuid"})
 
         response = update_dashboard("nonexistent-uuid", {"test": "data"})
-        
+
         # Should have called create_dashboard
         mock_create.assert_called_once()
         assert response.status_code == 201
-    
+
     # Other HTTP errors should still raise
     with mock.patch("dashboard_client.requests.get") as mock_get:
         mock_get_resp = mock.Mock()
@@ -240,26 +242,26 @@ def test_create_or_update_dashboard():
     with (
         mock.patch("dashboard_client.create_dashboard") as mock_create,
         mock.patch("dashboard_client.update_dashboard") as mock_update,
-        mock.patch("dashboard_client.load_mappings", return_value={})
+        mock.patch("dashboard_client.load_mappings", return_value={}),
     ):
         mock_create.return_value = mock.Mock(status_code=201, json=lambda: {"uuid": "new-uuid"})
-        
+
         response = create_or_update_dashboard("dashboards/test_dashboard.json")
-        
+
         assert response.status_code == 201
         mock_create.assert_called_once()
         mock_update.assert_not_called()
-    
+
     # Test update case - existing mapping
     with (
         mock.patch("dashboard_client.create_dashboard") as mock_create,
         mock.patch("dashboard_client.update_dashboard") as mock_update,
-        mock.patch("dashboard_client.load_mappings", return_value={"configs/test.json": "existing-uuid"})
+        mock.patch("dashboard_client.load_mappings", return_value={"configs/test.json": "existing-uuid"}),
     ):
         mock_update.return_value = mock.Mock(status_code=200, json=lambda: {"uuid": "existing-uuid"})
-        
+
         response = create_or_update_dashboard("dashboards/test_dashboard.json")
-        
+
         assert response.status_code == 200
         mock_update.assert_called_once_with("existing-uuid", Path("dashboards/test_dashboard.json"))
         mock_create.assert_not_called()
@@ -273,7 +275,7 @@ def test_create_dashboards():
     # Expected use - successful batch creation from list
     with (
         mock.patch("dashboard_client.create_dashboard") as mock_create,
-        mock.patch("dashboard_client.load_mappings", return_value={})  # No existing dashboards
+        mock.patch("dashboard_client.load_mappings", return_value={}),  # No existing dashboards
     ):
         # Mock successful responses
         mock_create.side_effect = [
@@ -302,7 +304,7 @@ def test_create_dashboards():
     # Expected use - from directory
     with (
         mock.patch("dashboard_client.create_dashboard") as mock_create,
-        mock.patch("dashboard_client.load_mappings", return_value={})
+        mock.patch("dashboard_client.load_mappings", return_value={}),
     ):
         mock_create.return_value = mock.Mock(status_code=201, json=lambda: {"uuid": "new-uuid"})
 
@@ -321,7 +323,7 @@ def test_create_dashboards():
     # Edge case - single file path (not a list or directory)
     with (
         mock.patch("dashboard_client.create_dashboard") as mock_create,
-        mock.patch("dashboard_client.load_mappings", return_value={})
+        mock.patch("dashboard_client.load_mappings", return_value={}),
     ):
         mock_create.return_value = mock.Mock(status_code=201)
 
@@ -339,7 +341,7 @@ def test_create_dashboards():
     # Edge case - mix of successful and failed creations
     with (
         mock.patch("dashboard_client.create_dashboard") as mock_create,
-        mock.patch("dashboard_client.load_mappings", return_value={})
+        mock.patch("dashboard_client.load_mappings", return_value={}),
     ):
         # First succeeds, second fails, third succeeds
         mock_create.side_effect = [mock.Mock(status_code=201), Exception("API Error"), mock.Mock(status_code=201)]
@@ -375,23 +377,23 @@ def test_create_dashboards():
         assert len(responses) == 1  # One failed response
         assert Path("/nonexistent/directory") in responses
         assert responses[Path("/nonexistent/directory")].status_code == 500
-    
+
     # Test with create_or_update_dashboard mock
     with mock.patch("dashboard_client.create_or_update_dashboard") as mock_create_or_update:
         mock_create_or_update.side_effect = [
             mock.Mock(status_code=201, json=lambda: {"uuid": "uuid-1"}),
             mock.Mock(status_code=200, json=lambda: {"uuid": "uuid-2"}),
         ]
-        
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
-            
+
             # Create test dashboard files
             (temp_path / "dash1.json").write_text('{"name": "Dashboard 1"}')
             (temp_path / "dash2.json").write_text('{"name": "Dashboard 2"}')
-            
+
             responses = create_dashboards(temp_dir)
-            
+
             assert len(responses) == 2
             assert mock_create_or_update.call_count == 2
 
@@ -535,55 +537,55 @@ def test_update_dashboards():
 def test_category_uuid_env_var():
     """Test GLASSNODE_CATEGORY_UUID environment variable handling"""
     import dashboard_client
-    
+
     # Save original values
     original_category_uuid = dashboard_client.CATEGORY_UUID
     original_default_category = dashboard_client.DEFAULT_CATEGORY
-    
+
     try:
         # Test when env var is not set (default behavior)
         dashboard_client.CATEGORY_UUID = None
         dashboard_client.DEFAULT_CATEGORY = "My Dashboards"
-        
+
         with mock.patch("requests.post") as mock_post:
             mock_response = mock.Mock()
             mock_response.status_code = 201
             mock_response.raise_for_status = mock.Mock()
             mock_post.return_value = mock_response
-            
+
             create_dashboard({"test": "data"})
-            
+
             call_json = mock_post.call_args[1]["json"]
             assert call_json["categoryUuid"] == "My Dashboards"
-        
+
         # Test when env var is set
         test_category_uuid = "test-category-uuid-123"
         dashboard_client.CATEGORY_UUID = test_category_uuid
         dashboard_client.DEFAULT_CATEGORY = test_category_uuid
-        
+
         with mock.patch("requests.post") as mock_post:
             mock_response = mock.Mock()
             mock_response.status_code = 201
             mock_response.raise_for_status = mock.Mock()
             mock_post.return_value = mock_response
-            
+
             create_dashboard({"test": "data"})
-            
+
             call_json = mock_post.call_args[1]["json"]
             assert call_json["categoryUuid"] == test_category_uuid
-            
+
         # Test explicit category_uuid parameter overrides env var
         with mock.patch("requests.post") as mock_post:
             mock_response = mock.Mock()
             mock_response.status_code = 201
             mock_response.raise_for_status = mock.Mock()
             mock_post.return_value = mock_response
-            
+
             create_dashboard({"test": "data"}, category_uuid="explicit-category")
-            
+
             call_json = mock_post.call_args[1]["json"]
             assert call_json["categoryUuid"] == "explicit-category"
-            
+
         # Test update dashboard uses DEFAULT_CATEGORY when dashboard has no category
         with (
             mock.patch("requests.get") as mock_get,
@@ -593,15 +595,15 @@ def test_category_uuid_env_var():
             mock_get_resp.json.return_value = {}  # No categoryUuid
             mock_get_resp.raise_for_status = mock.Mock()
             mock_get.return_value = mock_get_resp
-            
+
             mock_put_resp = mock.Mock()
             mock_put_resp.raise_for_status = mock.Mock()
             mock_put.return_value = mock_put_resp
-            
+
             update_dashboard("uuid-123", {})
             put_json = mock_put.call_args[1]["json"]
             assert put_json["categoryUuid"] == test_category_uuid
-            
+
     finally:
         # Restore original values
         dashboard_client.CATEGORY_UUID = original_category_uuid

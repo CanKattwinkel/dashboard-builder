@@ -11,6 +11,10 @@ API_KEY = os.getenv("GLASSNODE_API_KEY")
 if not API_KEY:
     raise ValueError("GLASSNODE_API_KEY not found in environment variables")
 
+# Optional category UUID for dashboards
+CATEGORY_UUID = os.getenv("GLASSNODE_CATEGORY_UUID")
+DEFAULT_CATEGORY = CATEGORY_UUID if CATEGORY_UUID else "My Dashboards"
+
 MAPPINGS_FILE = ".dashboard_mappings.json"
 
 
@@ -34,6 +38,7 @@ def save_mapping(config_path, dashboard_uuid):
 def update_dashboard(dashboard_uuid: str, dashboard_data: Union[Dict[str, Any], str, Path]) -> requests.Response:
     """
     Update a Glassnode dashboard via their API.
+    If the dashboard doesn't exist (404), falls back to creating a new one.
 
     Args:
         dashboard_uuid: The UUID of the dashboard to update
@@ -42,6 +47,9 @@ def update_dashboard(dashboard_uuid: str, dashboard_data: Union[Dict[str, Any], 
     Returns:
         Response object from the API call
     """
+    # Store the original dashboard_data path if it's a file
+    original_data = dashboard_data
+    
     # Load from file if path provided
     if isinstance(dashboard_data, (str, Path)):
         with open(dashboard_data, "r") as f:
@@ -49,39 +57,53 @@ def update_dashboard(dashboard_uuid: str, dashboard_data: Union[Dict[str, Any], 
 
     # First, get the current dashboard to retrieve its category UUID
     params = {"api_key": API_KEY}
-    response = requests.get(f"https://api.glassnode.com/v1/dashboards/{dashboard_uuid}", params=params)
-    response.raise_for_status()
+    try:
+        response = requests.get(f"https://api.glassnode.com/v1/dashboards/{dashboard_uuid}", params=params)
+        response.raise_for_status()
+        
+        current_dashboard = response.json()
+        category_uuid = current_dashboard.get("categoryUuid", DEFAULT_CATEGORY)
 
-    current_dashboard = response.json()
-    category_uuid = current_dashboard.get("categoryUuid", "My Dashboards")
+        # Wrap dashboard data with category UUID
+        dashboard_data = {"categoryUuid": category_uuid, "data": dashboard_data}
 
-    # Wrap dashboard data with category UUID
-    dashboard_data = {"categoryUuid": category_uuid, "data": dashboard_data}
+        # Update the dashboard
+        url = f"https://api.glassnode.com/v1/dashboards/{dashboard_uuid}"
 
-    # Update the dashboard
-    url = f"https://api.glassnode.com/v1/dashboards/{dashboard_uuid}"
+        headers = {"content-type": "application/json"}
 
-    headers = {"content-type": "application/json"}
+        response = requests.put(url, json=dashboard_data, headers=headers, params=params)
+        response.raise_for_status()
 
-    response = requests.put(url, json=dashboard_data, headers=headers, params=params)
-    response.raise_for_status()
-
-    return response
+        return response
+        
+    except requests.HTTPError as e:
+        if e.response.status_code == 404:
+            # Dashboard doesn't exist, create a new one instead
+            print(f"  Dashboard {dashboard_uuid} not found, creating new dashboard instead...")
+            return create_dashboard(original_data)
+        else:
+            # Re-raise other HTTP errors
+            raise
 
 
 def create_dashboard(
-    dashboard_data: Union[Dict[str, Any], str, Path], category_uuid: str = "My Dashboards"
+    dashboard_data: Union[Dict[str, Any], str, Path], category_uuid: str = None
 ) -> requests.Response:
     """
     Create a new Glassnode dashboard via their API.
 
     Args:
         dashboard_data: Either a dict with dashboard config or path to JSON file
-        category_uuid: Category for the dashboard (default matches update_dashboard)
+        category_uuid: Category for the dashboard (defaults to GLASSNODE_CATEGORY_UUID env var or "My Dashboards")
 
     Returns:
         Response object from the API call
     """
+    # Use default category if not specified
+    if category_uuid is None:
+        category_uuid = DEFAULT_CATEGORY
+        
     # Load from file if path provided
     if isinstance(dashboard_data, (str, Path)):
         with open(dashboard_data, "r") as f:
@@ -104,14 +126,14 @@ def create_dashboard(
 
 
 def create_or_update_dashboard(
-    dashboard_data: Union[Dict[str, Any], str, Path], category_uuid: str = "My Dashboards"
+    dashboard_data: Union[Dict[str, Any], str, Path], category_uuid: str = None
 ) -> requests.Response:
     """
     Create or update a dashboard based on existing mappings.
     
     Args:
         dashboard_data: Either a dict with dashboard config or path to JSON file
-        category_uuid: Category for the dashboard (default: "My Dashboards")
+        category_uuid: Category for the dashboard (defaults to GLASSNODE_CATEGORY_UUID env var or "My Dashboards")
         
     Returns:
         Response object from the API call
@@ -137,14 +159,14 @@ def create_or_update_dashboard(
 
 
 def create_dashboards(
-    dashboard_files: Union[List[Union[str, Path]], str, Path], category_uuid: str = "My Dashboards"
+    dashboard_files: Union[List[Union[str, Path]], str, Path], category_uuid: str = None
 ) -> Dict[Path, requests.Response]:
     """
     Create multiple Glassnode dashboards via their API.
 
     Args:
         dashboard_files: Either a list of dashboard file paths or a directory path
-        category_uuid: Category for the dashboards (default: "My Dashboards")
+        category_uuid: Category for the dashboards (defaults to GLASSNODE_CATEGORY_UUID env var or "My Dashboards")
 
     Returns:
         Dictionary mapping file paths to Response objects

@@ -18,9 +18,22 @@ export GLASSNODE_API_KEY=your_api_key_here
 Or create a `.env` file:
 ```
 GLASSNODE_API_KEY=your_api_key_here
+GLASSNODE_CATEGORY_UUID=your_category_uuid  # Optional: default category for dashboards
 ```
 
 ## Usage
+
+### Run (build + deploy)
+
+```bash
+# Single dashboard
+./dash run configs/my_dashboard.json
+
+# All dashboards in directory
+./dash run configs/examples/
+```
+
+Combines building from config and deploying to Glassnode in one step.
 
 ### Build a dashboard from configuration
 
@@ -67,6 +80,8 @@ Update all dashboards in a directory:
 ./dash update configs/examples/
 ./dash update dashboards/examples/
 ```
+
+If a dashboard was manually deleted on Glassnode, update commands will automatically create a new dashboard.
 
 ## Configuration Format
 
@@ -137,6 +152,20 @@ Both formats are supported:
 {
   "/derivatives/futures_*": {
     "chartStyle": "column",
+    "resolution": "1h"
+  }
+}
+```
+
+**Important**: Pattern order matters. When multiple patterns match a metric, they are applied in the order they appear in the JSON file. Place general patterns first, followed by more specific patterns:
+
+```json
+{
+  "/derivatives/futures_*": {
+    "zoom": "1y"
+  },
+  "/derivatives/futures_funding_rate_*": {
+    "zoom": "1m",
     "resolution": "1h"
   }
 }

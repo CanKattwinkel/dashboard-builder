@@ -148,6 +148,72 @@ def cmd_create(args):
         sys.exit(1)
 
 
+def cmd_run(args):
+    """Build and deploy dashboard(s) to Glassnode"""
+    try:
+        config_path = Path(args.config)
+        
+        if config_path.is_dir():
+            # Batch run
+            print(f"📦 Building dashboards from {config_path}...")
+            dashboards = build_dashboards_from_directory(config_path)
+            
+            # Save all built dashboards
+            for file_path, dashboard in dashboards.items():
+                output_path = config_to_dashboard_path(file_path)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                with open(output_path, "w") as f:
+                    json.dump(dashboard.model_dump(exclude_none=True), f, indent=2)
+                
+                print(f"  ✓ Built: {output_path}")
+            
+            # Deploy all dashboards
+            dashboard_dir = Path(str(config_path).replace("configs", "dashboards", 1))
+            print(f"\n🚀 Deploying dashboards...")
+            responses = create_dashboards(dashboard_dir)
+            
+            # Save mappings for successful operations
+            mappings = load_mappings()
+            for file_path, response in responses.items():
+                if response.status_code == 200 and response.json().get('uuid'):
+                    uuid = response.json()['uuid']
+                    config_path_str = dashboard_to_config_path(file_path)
+                    mappings[config_path_str] = uuid
+                    print(f"  UUID: {uuid} → {config_path_str}")
+            
+            # Save all mappings at once
+            with open(MAPPINGS_FILE, "w") as f:
+                json.dump(mappings, f, indent=2)
+            
+            # Report results
+            success_count = sum(1 for r in responses.values() if r.status_code == 200)
+            print(f"\n✓ Successfully deployed {success_count}/{len(dashboards)} dashboards")
+        else:
+            # Single file run
+            print(f"📦 Building dashboard from {config_path}...")
+            dashboard_path, dashboard = build_and_save_dashboard(config_path)
+            print(f"  ✓ Built: {dashboard_path}")
+            print(f"  Name: {dashboard.meta.name}")
+            print(f"  Metrics: {len(dashboard.configs)}")
+            
+            print(f"\n🚀 Deploying dashboard...")
+            response = create_or_update_dashboard(dashboard_path)
+            print(f"  ✓ Deployed (status: {response.status_code})")
+            
+            if response.json() and response.json().get('uuid'):
+                uuid = response.json()['uuid']
+                print(f"  UUID: {uuid}")
+                
+                # Save mapping
+                config_path_str = str(config_path)
+                save_mapping(config_path_str, uuid)
+                print(f"  Saved mapping: {config_path_str} → {uuid}")
+    except Exception as e:
+        print(f"✗ Run failed: {e}")
+        sys.exit(1)
+
+
 def cmd_update(args):
     """Update existing dashboard(s) on Glassnode"""
     try:
@@ -229,6 +295,10 @@ def main():
     update_parser.add_argument("uuid", help="Dashboard UUID, config file/directory, or dashboards directory")
     update_parser.add_argument("file", nargs='?', help="Dashboard JSON file (optional if using config path)")
     
+    # Run command
+    run_parser = subparsers.add_parser("run", help="Build and deploy dashboard(s) to Glassnode (combines build + create/update)")
+    run_parser.add_argument("config", help="Config file or directory (e.g., configs/sol_futures.json or configs/examples/)")
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -242,6 +312,8 @@ def main():
         cmd_create(args)
     elif args.command == "update":
         cmd_update(args)
+    elif args.command == "run":
+        cmd_run(args)
 
 
 if __name__ == "__main__":

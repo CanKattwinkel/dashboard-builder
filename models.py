@@ -16,6 +16,7 @@ class MetricMeta(BaseModel):
     chartType: Optional[str] = None
     resolution: Optional[str] = "24h"
     exchange: Optional[str] = None
+    period: Optional[str] = None
     movingMedian: Optional[int] = None
     movingAverage: Optional[str] = None
     expMovingAverage: Optional[int] = None

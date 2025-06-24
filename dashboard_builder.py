@@ -123,6 +123,7 @@ def build_metric_config(
     chartType: Optional[str] = None,
     resolution: Optional[str] = None,
     exchange: Optional[str] = None,
+    period: Optional[str] = None,
     # Extra overrides
     zoom: Optional[str] = None,
     scale: Optional[str] = None,
@@ -174,6 +175,7 @@ def build_metric_config(
         "chartType",
         "resolution",
         "exchange",
+        "period",
         "movingMedian",
         "movingAverage",
         "expMovingAverage",
@@ -206,6 +208,8 @@ def build_metric_config(
         meta_kwargs["resolution"] = resolution
     if exchange is not None:
         meta_kwargs["exchange"] = exchange
+    if period is not None:
+        meta_kwargs["period"] = period
 
     meta = MetricMeta(**meta_kwargs)
 

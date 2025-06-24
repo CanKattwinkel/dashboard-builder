@@ -4,10 +4,10 @@ A command-line tool for generating Glassnode dashboards from JSON configurations
 
 ## Installation
 
-Requires Python 3.12+:
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/):
 
 ```bash
-pip install -e .
+uv sync
 ```
 
 Set your Glassnode API key via environment variable or `.env` file:

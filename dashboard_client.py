@@ -175,7 +175,7 @@ def create_dashboards(
         # From list of files
         responses = create_dashboards(["dashboards/btc.json", "dashboards/eth.json"])
 
-        # From directory
+        # From directory (including subdirectories)
         responses = create_dashboards("dashboards/examples")
         for file_path, response in responses.items():
             if response.status_code == 200:
@@ -185,7 +185,7 @@ def create_dashboards(
     if isinstance(dashboard_files, (str, Path)):
         directory = Path(dashboard_files)
         if directory.is_dir():
-            dashboard_files = list(directory.glob("*.json"))
+            dashboard_files = list(directory.rglob("*.json"))
         else:
             dashboard_files = [dashboard_files]
 
@@ -242,7 +242,7 @@ def update_dashboards(
             ("uuid-2", "dashboards/eth.json")
         ])
 
-        # From directory (uses .dashboard_mappings.json)
+        # From directory (uses .dashboard_mappings.json, includes subdirectories)
         responses = update_dashboards("dashboards/examples")
     """
     # Handle directory input - load mappings from .dashboard_mappings.json
@@ -263,7 +263,14 @@ def update_dashboards(
                 dashboard_path = Path(str(Path(config_path).parent).replace("configs", "dashboards", 1)) / (
                     Path(config_path).stem + "_dashboard.json"
                 )
-                if str(directory) in str(dashboard_path) and dashboard_path.exists():
+                # Check if dashboard is in the target directory (recursive search)
+                try:
+                    dashboard_path.relative_to(directory)
+                    is_in_directory = dashboard_path.exists()
+                except ValueError:
+                    is_in_directory = False
+                
+                if is_in_directory:
                     dashboard_mapping[uuid] = dashboard_path
 
             if not dashboard_mapping:

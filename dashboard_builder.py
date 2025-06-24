@@ -409,7 +409,7 @@ def build_dashboards_from_directory(
     directory_path: Union[str, Path], pattern: str = "*.json"
 ) -> Dict[Path, Dashboard]:
     """
-    Creates dashboards from all JSON specification files in a directory.
+    Creates dashboards from all JSON specification files in a directory and its subdirectories.
 
     Args:
         directory_path: Path to the directory containing JSON specification files
@@ -429,10 +429,12 @@ def build_dashboards_from_directory(
         raise ValueError(f"Not a directory: {directory_path}")
 
     dashboards = {}
-    json_files = list(directory_path.glob(pattern))
+    
+    # Use rglob for recursive search
+    json_files = list(directory_path.rglob(pattern))
 
     if not json_files:
-        raise ValueError(f"No JSON files found in {directory_path} matching pattern '{pattern}'")
+        raise ValueError(f"No JSON files found recursively in {directory_path} matching pattern '{pattern}'")
 
     for json_file in json_files:
         try:

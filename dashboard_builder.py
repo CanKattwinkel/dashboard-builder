@@ -35,7 +35,7 @@ def _load_defaults() -> Tuple[Dict, Dict, Dict]:
     return asset_defaults, metric_defaults, overrides
 
 
-def _get_defaults_for_metric(metric_path: Optional[str], asset: str) -> Dict[str, Any]:
+def _get_defaults_for_metric(metric_code: str, asset: str) -> Dict[str, Any]:
     """
     Get all applicable defaults for a metric-asset combination.
     Returns merged defaults following the priority order.
@@ -45,35 +45,25 @@ def _get_defaults_for_metric(metric_path: Optional[str], asset: str) -> Dict[str
     # Start with empty defaults
     defaults = {}
 
-    # If no metric path (dotted format), return empty defaults
-    if metric_path is None:
-        return defaults
-
     # 1. Apply asset defaults
     if asset in asset_defaults:
         defaults.update(asset_defaults[asset])
 
     # 2. Apply metric defaults (exact match or pattern)
     for pattern, values in metric_defaults.items():
-        if pattern == metric_path or fnmatch.fnmatch(metric_path, pattern):
+        if pattern == metric_code or fnmatch.fnmatch(metric_code, pattern):
             defaults.update(values)
 
     # 3. Apply asset-metric overrides
     if asset in overrides:
         for pattern, values in overrides[asset].items():
-            if pattern == metric_path or fnmatch.fnmatch(metric_path, pattern):
+            if pattern == metric_code or fnmatch.fnmatch(metric_code, pattern):
                 defaults.update(values)
 
     return defaults
 
 
-def _format_metric_code_from_path(metric_path: str) -> str:
-    """Converts a metric path like '/market/market_cap_usd' to 'market.MarketCapUsd'."""
-    parts = metric_path.strip("/").split("/")
-    domain = parts[0].lower()  # Ensure domain is lowercase
-    metric_name_parts = parts[1].split("_")
-    formatted_metric_name = "".join(word.title() for word in metric_name_parts if word)
-    return f"{domain}.{formatted_metric_name}"
+
 
 
 def _generate_metric_name(metric_code: str) -> str:
@@ -136,8 +126,7 @@ def build_metric_config(
     Creates a single metric configuration with sensible defaults.
 
     Args:
-        metric_code: The metric path (e.g., "/market/mvrv_z_score", "/indicators/fear_greed")
-                    Also supports dotted format (e.g., "market.MvrvZScore") for backwards compatibility
+        metric_code: The metric code in dot notation (e.g., "market.MvrvZScore", "indicators.FearGreed")
         asset: The asset code (e.g., "BTC", "ETH")
         name: Display name for the metric (auto-generated if not provided)
         uuid_str: UUID for the metric (auto-generated if not provided)
@@ -146,18 +135,8 @@ def build_metric_config(
     Returns:
         MetricConfig object
     """
-    # Store original metric path for defaults lookup
-    original_metric_path = metric_code
-
-    # Handle both formats: "market.MvrvZScore" and "/market/mvrv_z_score"
-    if "/" in metric_code:
-        metric_code = _format_metric_code_from_path(metric_code)
-    else:
-        # No defaults loaded for dotted format
-        original_metric_path = None
-
     # Get all applicable defaults for this metric-asset combination
-    defaults = _get_defaults_for_metric(original_metric_path, asset.upper())
+    defaults = _get_defaults_for_metric(metric_code, asset.upper())
 
     # Generate UUID and name if not provided
     if uuid_str is None:
@@ -295,20 +274,20 @@ def build_dashboard(
         Dashboard object
 
     Examples:
-        # Simple single asset with metric paths
+        # Simple single asset with metric codes
         dashboard = build_dashboard(
             name="BTC Metrics",
             asset="BTC",
-            metrics=["/market/mvrv_z_score", "/indicators/fear_greed"]
+            metrics=["market.MvrvZScore", "indicators.FearGreed"]
         )
 
         # Multi-asset with overrides
         dashboard = create_dashboard(
             name="Multi Asset",
             metrics=[
-                {"code": "/market/mvrv_z_score", "asset": "BTC"},
-                {"code": "/market/mvrv_z_score", "asset": "ETH", "zoom": "1y"},
-                {"code": "/indicators/fear_greed", "asset": "BTC", "chartStyle": "column"}
+                {"code": "market.MvrvZScore", "asset": "BTC"},
+                {"code": "market.MvrvZScore", "asset": "ETH", "zoom": "1y"},
+                {"code": "indicators.FearGreed", "asset": "BTC", "chartStyle": "column"}
             ]
         )
 
@@ -316,11 +295,9 @@ def build_dashboard(
         dashboard = create_dashboard(
             name="ETH Futures",
             asset="ETH",
-            metrics=["/derivatives/futures_annualized_basis_3m", "/derivatives/futures_open_interest"],
+            metrics=["derivatives.FuturesAnnualizedBasis3m", "derivatives.FuturesOpenInterest"],
             common_overrides={"resolution": "1h", "exchange": "binance"}
         )
-
-        # Note: Also supports dotted format (e.g., "market.PriceUsdClose") for backwards compatibility
     """
     if dashboard_overrides is None:
         dashboard_overrides = {}
@@ -382,14 +359,14 @@ def build_dashboard_from_file(file_path: Union[str, Path]) -> Dashboard:
                 "resolution": "1h"
             },
             "metrics": [
-                "/market/price_usd_close",
-                "/market/mvrv_z_score",
+                "market.PriceUsdClose",
+                "market.MvrvZScore",
                 {
-                    "code": "/indicators/fear_greed",
+                    "code": "indicators.FearGreed",
                     "chartStyle": "column"
                 },
                 {
-                    "code": "/derivatives/futures_open_interest",
+                    "code": "derivatives.FuturesOpenInterest",
                     "asset": "ETH",
                     "exchange": "binance"
                 }

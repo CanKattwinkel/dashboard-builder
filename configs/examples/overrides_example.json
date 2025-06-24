@@ -6,19 +6,19 @@
     "exchange": "binance"
   },
   "metrics": [
-    "/derivatives/futures_open_interest_perpetual_sum",
-    "/derivatives/futures_volume_daily_perpetual_sum",
+    "derivatives.FuturesOpenInterestPerpetualSum",
+    "derivatives.FuturesVolumeDailyPerpetualSum",
     {
-      "code": "/derivatives/futures_cvd_perpetual",
+      "code": "derivatives.FuturesCvdPerpetual",
       "chartStyle": "column",
       "scale": "lin"
     },
     {
-      "code": "/derivatives/futures_funding_rate_perpetual",
+      "code": "derivatives.FuturesFundingRatePerpetual",
       "zoom": "3m"
     },
     {
-      "code": "/derivatives/futures_open_interest_crypto_margin_relative_perpetual",
+      "code": "derivatives.FuturesOpenInterestCryptoMarginRelativePerpetual",
       "name": "Crypto Margin OI Ratio"
     }
   ]

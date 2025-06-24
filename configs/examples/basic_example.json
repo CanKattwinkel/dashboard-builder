@@ -2,9 +2,9 @@
   "name": "SOL Basic Futures Dashboard",
   "asset": "SOL",
   "metrics": [
-    "/derivatives/futures_open_interest_sum",
-    "/derivatives/futures_volume_daily_sum",
-    "/derivatives/futures_funding_rate_perpetual",
-    "/derivatives/futures_annualized_basis_3m"
+    "derivatives.FuturesOpenInterestSum",
+    "derivatives.FuturesVolumeDailySum",
+    "derivatives.FuturesFundingRatePerpetual",
+    "derivatives.FuturesAnnualizedBasis3m"
   ]
 }

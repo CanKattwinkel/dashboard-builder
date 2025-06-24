@@ -1,18 +1,18 @@
 {
-  "/market/price_usd_close": {
+  "market.PriceUsdClose": {
     "price": false
   },
-  "/market/spot_volume_*": {
+  "market.SpotVolume*": {
     "currency": "USD"
   },
-  "/derivatives/futures_*": {
+  "derivatives.Futures*": {
     "zoom": "1y"
   },
-  "/derivatives/futures_open_interest_*": {
+  "derivatives.FuturesOpenInterest*": {
     "chartStyle": "column",
     "currency": "USD"
   },
-  "/derivatives/futures_funding_rate_*": {
+  "derivatives.FuturesFundingRate*": {
     "zoom": "1m",
     "resolution": "1h"
   }

@@ -91,9 +91,9 @@ If a dashboard was manually deleted on Glassnode, update commands will automatic
 {
   "name": "BTC Overview",
   "metrics": [
-    "/market/price_usd_close",
-    "/market/volume_sum",
-    "/network/active_addresses_count"
+    "market.PriceUsdClose",
+    "market.VolumeSum",
+    "network.ActiveAddressesCount"
   ]
 }
 ```
@@ -109,17 +109,17 @@ If a dashboard was manually deleted on Glassnode, update commands will automatic
   },
   "metrics": [
     {
-      "code": "/market/price_usd_close",
+      "code": "market.PriceUsdClose",
       "asset": "BTC",
       "chartStyle": "line"
     },
     {
-      "code": "/market/price_usd_close", 
+      "code": "market.PriceUsdClose", 
       "asset": "ETH",
       "chartStyle": "column",
       "zoom": "1y"
     },
-    "/derivatives/futures_open_interest_sum"
+    "derivatives.FuturesOpenInterestSum"
   ]
 }
 ```
@@ -134,11 +134,16 @@ Settings are applied in priority order:
 5. Asset defaults (`defaults/assets.json`)
 6. Model defaults (lowest)
 
-## Metric Formats
+## Metric Format
 
-Both formats are supported:
-- `/market/price_usd_close` (preferred)
-- `market.PriceUsdClose` (caution: will not use default files)
+All metrics must use **dot notation** format:
+- `market.PriceUsdClose` ✅ 
+- `derivatives.FuturesOpenInterestSum` ✅
+- `indicators.FearGreed` ✅
+
+The metric code format is `{domain}.{MetricName}` where:
+- `domain` is lowercase (market, derivatives, network, etc.)
+- `MetricName` is PascalCase (each word capitalized, no separators)
 
 ## Default Files
 
@@ -150,7 +155,7 @@ Both formats are supported:
 
 ```json
 {
-  "/derivatives/futures_*": {
+  "derivatives.Futures*": {
     "chartStyle": "column",
     "resolution": "1h"
   }
@@ -161,10 +166,10 @@ Both formats are supported:
 
 ```json
 {
-  "/derivatives/futures_*": {
+  "derivatives.Futures*": {
     "zoom": "1y"
   },
-  "/derivatives/futures_funding_rate_*": {
+  "derivatives.FuturesFundingRate*": {
     "zoom": "1m",
     "resolution": "1h"
   }
@@ -190,7 +195,7 @@ from dashboard_builder import build_dashboard
 from dashboard_client import create_dashboard, update_dashboard
 
 # Build dashboard
-dashboard = build_dashboard("My Dashboard", ["/market/price_usd_close"])
+dashboard = build_dashboard("My Dashboard", ["market.PriceUsdClose"])
 
 # Create on Glassnode
 uuid = create_dashboard(dashboard.model_dump())

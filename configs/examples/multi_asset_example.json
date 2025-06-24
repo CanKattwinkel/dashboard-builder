@@ -2,29 +2,29 @@
   "name": "Multi-Asset Futures Comparison",
   "metrics": [
     {
-      "code": "/derivatives/futures_open_interest_sum",
+      "code": "derivatives.FuturesOpenInterestSum",
       "asset": "BTC"
     },
     {
-      "code": "/derivatives/futures_open_interest_sum",
+      "code": "derivatives.FuturesOpenInterestSum",
       "asset": "ETH"
     },
     {
-      "code": "/derivatives/futures_open_interest_sum",
+      "code": "derivatives.FuturesOpenInterestSum",
       "asset": "SOL"
     },
     {
-      "code": "/derivatives/futures_funding_rate_perpetual",
+      "code": "derivatives.FuturesFundingRatePerpetual",
       "asset": "BTC",
       "chartStyle": "line"
     },
     {
-      "code": "/derivatives/futures_funding_rate_perpetual",
+      "code": "derivatives.FuturesFundingRatePerpetual",
       "asset": "ETH",
       "chartStyle": "line"
     },
     {
-      "code": "/derivatives/futures_funding_rate_perpetual",
+      "code": "derivatives.FuturesFundingRatePerpetual",
       "asset": "SOL",
       "chartStyle": "line"
     }

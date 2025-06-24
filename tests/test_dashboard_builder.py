@@ -20,7 +20,7 @@ from dashboard_builder import (
 def test_build_metric_config():
     """Test building individual metric configurations"""
     # Expected use - basic metric
-    config = build_metric_config(metric_code="/market/price_usd", asset="BTC")
+    config = build_metric_config(metric_code="market.PriceUsd", asset="BTC")
     assert config.meta.asset == "BTC"
     assert config.configType == "metric"
     assert hasattr(config, "uuid")
@@ -28,7 +28,7 @@ def test_build_metric_config():
 
     # Expected use - with custom values
     config = build_metric_config(
-        metric_code="/market/volume",
+        metric_code="market.Volume",
         asset="ETH",
         name="Custom Volume",
         resolution="1h",
@@ -43,7 +43,7 @@ def test_build_metric_config():
 
     # Edge case - override defaults from config files
     config = build_metric_config(
-        metric_code="/derivatives/futures_open_interest",
+        metric_code="derivatives.FuturesOpenInterest",
         asset="SOL",
         currency="EUR",  # Override default USD
         chartStyle="line",  # Override default column
@@ -53,25 +53,25 @@ def test_build_metric_config():
 
     # Test overlapping patterns - more specific pattern should win
     # Test general futures pattern
-    config = build_metric_config(metric_code="/derivatives/futures_volume", asset="BTC")
-    assert config.extra.zoom == "1y"  # From /derivatives/futures_*
+    config = build_metric_config(metric_code="derivatives.FuturesVolume", asset="BTC")
+    assert config.extra.zoom == "1y"  # From derivatives.Futures*
     assert not hasattr(config.meta, "resolution") or config.meta.resolution == "24h"  # Default
 
     # Test specific funding rate pattern
-    config = build_metric_config(metric_code="/derivatives/futures_funding_rate_all", asset="BTC")
-    assert config.extra.zoom == "1m"  # From /derivatives/futures_funding_rate_*
-    assert config.meta.resolution == "1h"  # From /derivatives/futures_funding_rate_*
+    config = build_metric_config(metric_code="derivatives.FuturesFundingRateAll", asset="BTC")
+    assert config.extra.zoom == "1m"  # From derivatives.FuturesFundingRate*
+    assert config.meta.resolution == "1h"  # From derivatives.FuturesFundingRate*
 
     # Failing case - missing required asset
     try:
-        build_metric_config(metric_code="/market/price", asset=None)
+        build_metric_config(metric_code="market.Price", asset=None)
         assert False, "Should require asset"
     except AttributeError:
         pass  # Expected - tries to call .upper() on None
 
     # Failing case - empty asset
     try:
-        build_metric_config(metric_code="/market/price", asset="")
+        build_metric_config(metric_code="market.Price", asset="")
         # Empty string is actually allowed, just becomes empty
         pass
     except Exception:
@@ -130,7 +130,7 @@ def test_build_dashboard():
     """Test building complete dashboards"""
     # Expected use - single asset dashboard
     dashboard = build_dashboard(
-        name="BTC Dashboard", asset="BTC", metrics=["/market/price", "/market/volume", "/market/market_cap"]
+        name="BTC Dashboard", asset="BTC", metrics=["market.Price", "market.Volume", "market.MarketCap"]
     )
     assert dashboard.meta.name == "BTC Dashboard"
     assert len(dashboard.configs) == 3
@@ -141,9 +141,9 @@ def test_build_dashboard():
     dashboard = build_dashboard(
         name="Multi Asset",
         metrics=[
-            {"code": "/market/price", "asset": "BTC"},
-            {"code": "/market/price", "asset": "ETH"},
-            {"code": "/market/price", "asset": "SOL"},
+            {"code": "market.Price", "asset": "BTC"},
+            {"code": "market.Price", "asset": "ETH"},
+            {"code": "market.Price", "asset": "SOL"},
         ],
     )
     assert len(dashboard.configs) == 3
@@ -156,10 +156,10 @@ def test_build_dashboard():
         name="Mixed Formats",
         asset="BTC",  # Default asset
         metrics=[
-            "/market/price",  # Uses default asset
-            {"code": "/market/volume", "asset": "ETH"},  # Override asset
-            {"metricCode": "market.MarketCap", "asset": "SOL"},  # Dotted format
-            {"code": "/indicators/nvt", "resolution": "4h"},  # Custom resolution
+            "market.Price",  # Uses default asset
+            {"code": "market.Volume", "asset": "ETH"},  # Override asset
+            {"metricCode": "market.MarketCap", "asset": "SOL"},  # Alternative key name
+            {"code": "indicators.Nvt", "resolution": "4h"},  # Custom resolution
         ],
     )
     assert len(dashboard.configs) == 4
@@ -173,7 +173,7 @@ def test_build_dashboard():
     dashboard = build_dashboard(
         name="Common Overrides",
         asset="BTC",
-        metrics=["/market/price", "/market/volume"],
+        metrics=["market.Price", "market.Volume"],
         dashboard_overrides={"resolution": "4h", "currency": "EUR", "chartStyle": "column"},
     )
     assert all(c.meta.resolution == "4h" for c in dashboard.configs)
@@ -185,8 +185,8 @@ def test_build_dashboard():
         name="Override Priority",
         asset="BTC",
         metrics=[
-            "/market/price",
-            {"code": "/market/volume", "resolution": "1h"},  # Overrides common
+            "market.Price",
+            {"code": "market.Volume", "resolution": "1h"},  # Overrides common
         ],
         dashboard_overrides={"resolution": "24h"},
     )
@@ -213,7 +213,7 @@ def test_build_dashboard():
     try:
         build_dashboard(
             name="No Asset",
-            metrics=["/market/price"],  # No default asset, no asset in metric
+            metrics=["market.Price"],  # No default asset, no asset in metric
         )
         assert False, "Should require asset"
     except ValueError as e:
@@ -223,7 +223,7 @@ def test_build_dashboard():
 def test_build_dashboard_from_file():
     """Test building dashboards from JSON files"""
     # Expected use - basic config file
-    config = {"name": "Test Dashboard", "asset": "BTC", "metrics": ["/market/price", "/market/volume"]}
+    config = {"name": "Test Dashboard", "asset": "BTC", "metrics": ["market.Price", "market.Volume"]}
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(config, f)
@@ -241,7 +241,7 @@ def test_build_dashboard_from_file():
     config_with_overrides = {
         "name": "Override Dashboard",
         "asset": "ETH",
-        "metrics": ["/market/price"],
+        "metrics": ["market.Price"],
         "dashboardOverrides": {"resolution": "1h", "currency": "EUR"},
     }
 
@@ -260,8 +260,8 @@ def test_build_dashboard_from_file():
     complex_config = {
         "name": "Complex Dashboard",
         "metrics": [
-            {"code": "/market/price", "asset": "BTC"},
-            {"code": "/market/price", "asset": "ETH", "resolution": "1h"},
+            {"code": "market.Price", "asset": "BTC"},
+            {"code": "market.Price", "asset": "ETH", "resolution": "1h"},
             {"metricCode": "derivatives.FuturesVolume", "asset": "SOL"},
         ],
     }
@@ -317,7 +317,7 @@ def test_build_dashboard_from_file():
     # Failing case - missing required fields
     invalid_config = {
         "asset": "BTC",
-        "metrics": ["/market/price"],
+        "metrics": ["market.Price"],
         # Missing 'name'!
     }
 
@@ -341,8 +341,8 @@ def test_build_dashboards_from_directory():
         temp_path = Path(temp_dir)
 
         # Create test JSON files
-        config1 = {"name": "Dashboard 1", "asset": "BTC", "metrics": ["/market/price"]}
-        config2 = {"name": "Dashboard 2", "asset": "ETH", "metrics": ["/market/volume", "/market/cap"]}
+        config1 = {"name": "Dashboard 1", "asset": "BTC", "metrics": ["market.Price"]}
+        config2 = {"name": "Dashboard 2", "asset": "ETH", "metrics": ["market.Volume", "market.Cap"]}
         config3 = {"name": "Dashboard 3", "asset": "SOL", "metrics": []}
 
         (temp_path / "dash1.json").write_text(json.dumps(config1))
@@ -375,8 +375,8 @@ def test_build_dashboards_from_directory():
         temp_path = Path(temp_dir)
 
         # Create files with different patterns
-        config_prod = {"name": "Prod Dashboard", "asset": "BTC", "metrics": ["/market/price"]}
-        config_test = {"name": "Test Dashboard", "asset": "ETH", "metrics": ["/market/volume"]}
+        config_prod = {"name": "Prod Dashboard", "asset": "BTC", "metrics": ["market.Price"]}
+        config_test = {"name": "Test Dashboard", "asset": "ETH", "metrics": ["market.Volume"]}
 
         (temp_path / "prod_dashboard.json").write_text(json.dumps(config_prod))
         (temp_path / "test_dashboard.json").write_text(json.dumps(config_test))
@@ -391,7 +391,7 @@ def test_build_dashboards_from_directory():
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
 
-        config = {"name": "Single Dashboard", "asset": "BTC", "metrics": ["/market/price"]}
+        config = {"name": "Single Dashboard", "asset": "BTC", "metrics": ["market.Price"]}
         (temp_path / "single.json").write_text(json.dumps(config))
 
         dashboards = build_dashboards_from_directory(temp_path)
@@ -404,7 +404,7 @@ def test_build_dashboards_from_directory():
         temp_path = Path(temp_dir)
 
         # Valid config
-        valid_config = {"name": "Valid Dashboard", "asset": "BTC", "metrics": ["/market/price"]}
+        valid_config = {"name": "Valid Dashboard", "asset": "BTC", "metrics": ["market.Price"]}
         (temp_path / "valid.json").write_text(json.dumps(valid_config))
 
         # Invalid JSON
